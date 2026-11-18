@@ -280,7 +280,15 @@ def place_balloons(anchors, outline, gap, r, iters=400):
         L = math.hypot(dx, dy) or 1
         far = (c.x + dx / L * 1e5, c.y + dy / L * 1e5)
         hit = LineString([(c.x, c.y), far]).intersection(ring)
-        hp = hit if hit.geom_type == "Point" else list(hit.geoms)[0]
+        if hit.is_empty:
+            hp = Point(a)
+        elif hit.geom_type == "Point":
+            hp = hit
+        elif hasattr(hit, "geoms"):
+            hp = list(hit.geoms)[0]
+            hp = hp if hp.geom_type == "Point" else Point(hp.coords[0])
+        else:
+            hp = Point(hit.coords[0])
         svals[k] = ring.project(hp)
     keys = sorted(svals, key=svals.get)
     n = len(keys)

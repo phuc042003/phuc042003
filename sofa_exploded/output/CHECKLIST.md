@@ -1,0 +1,17 @@
+# CHECKLIST LÀM VIỆC – Bản vẽ lắp ráp khung sofa (vòng 5)
+
+Quy tắc: làm xong + tự kiểm 1 bước mới đánh dấu [x] và sang bước sau.
+
+| # | Bước | Trạng thái | Kiểm chứng |
+|---|---|---|---|
+| B1 | Phân tích yêu cầu, lập checklist | [x] | File này |
+| B2 | Mô hình hình học lăng trụ: thanh LVL vát đầu 41°, ke góc tam giác 45°, pát L nhiều khối | [x] | geom.py; 56 chi tiết, check_overlaps (SAT) = 0 |
+| B3 | Ván ép 9/12/15/18 trong mô hình (ván hông tay 15, ván lưng 9, khung ngồi 18) + pát nối tựa–tay | [x] | material_of → Ván ép 9/15/18, LVL |
+| B4 | Quy tắc phụ kiện: lỗ Ø10 → ốc 4 chấu M8, lỗ Ø8 → ốc cấy M6; bulông dài theo ván 9→12, 12→16, 15→18, 18→21 | [x] | BOLT_LEN: P8×21 (8), P6×21 (8), P8×12 (4) |
+| B5 | Lỗ khoan trên mặt bất kỳ (kể cả mặt vát) + tách biến thể cùng KT khác lỗ | [x] | holes.py: 0 điểm lỗi; 6A/6B, 12A–D, 14A/B, 19A–C |
+| B6 | Engine vẽ: khử nét khuất cho đa diện lồi; hình chiếu lắp KHÔNG nét khuất; tự thêm hướng nhìn phụ khi chi tiết bị che | [x] | render.py: visibility() + best_aux(); trang 01 có hướng nhìn sau |
+| B7 | Trang cụm: 1 cụm = 1 trang A4 duy nhất (hình bung lớn, KT bao, bảng kê, phụ kiện kèm chiều dài bulông) | [x] | trang 09–14 |
+| B8 | Trang chi tiết: dim tổng L×W×T, dim vị trí lỗ, Ø lỗ, góc vát, đánh số phân biệt biến thể; KHÔNG xuất chi tiết pát | [x] | trang 15–40; VT16 góc 41°/139° |
+| B9 | Trang tổng: hình chiếu không nét khuất + hướng nhìn phụ, bước lắp, BOM, phụ kiện + bảng quy tắc | [x] | trang 01–08 |
+| B10 | Tự kiểm tra tự động + chấm điểm /10, sửa đến ≥ 9/10 | [x] | selfcheck.py: lần 1 = 9.55 → lần 2 = 9.9 → lần 3 = **10.0/10** (output/TU-KIEM-TRA.md) |
+| B11 | Xem ảnh từng trang, commit + push, báo cáo | [x] | Chấm trực quan ≈ 9.3/10: thanh 1870 vẽ 1:20; vài nhãn lỗ sát nhau ở ván lưng/đà đáy (vẫn đọc được) |
