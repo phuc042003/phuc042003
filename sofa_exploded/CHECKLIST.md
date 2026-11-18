@@ -25,3 +25,12 @@ Quy tắc: làm xong + tự kiểm 1 bước mới đánh dấu [x] và sang bư
 | C3 | Trang "Vị trí pát sắt": hình tổng có khoanh vùng mọi vị trí + bảng chi tiết | [x] | trang 08: 4×A, 2×B, 2×C |
 | C4 | Mỗi chi tiết A/B/C 1 trang: 2 hình chiếu phóng to + hình trục đo, dim định vị pát & lỗ, chỉ chỗ bắn bulông/vít, ghi chú | [x] | trang 09–11, tỉ lệ 1:2; A: hạ 10 mm, lỗ 17.5/20/12.5 |
 | C5 | Tự kiểm tra (thêm tiêu chí khoanh vùng + chi tiết pát) ≥ 9/10, xem ảnh, commit | [x] | 11 tiêu chí: 9.96 → **10.0/10**; đã xem ảnh trang 08–11 |
+
+## Vòng 7 – Gọn còn 5 trang A4
+
+| # | Bước | Trạng thái | Kiểm chứng |
+|---|---|---|---|
+| D1 | Trang 1 Tổng thể: hình chiếu KT bao, hình bung nhãn cụm + khoanh pát, trình tự lắp, tổng phụ kiện | [x] | SF-01 |
+| D2 | Trang 2 Gác tay (trái + phải), Trang 3 Tựa lưng (+ chi tiết pát B), Trang 4 Khung ngồi (+ chi tiết A, C), Trang 5 Khung đáy (+ chân) | [x] | SF-02…05 |
+| D3 | Mỗi trang cụm: hình bung lớn, KT bao, bảng kê (vật liệu, khác lỗ, vát 41°), phụ kiện + chiều dài bulông | [x] | bảng kê ghi 'khác lỗ', 'vát 41°/139°', 'vát 45°' |
+| D4 | Tự kiểm tra cho chế độ 5 trang ≥ 9/10, xem ảnh, commit | [x] | 11 tiêu chí = 10.0/10; xem ảnh sửa thêm 5 lỗi (KT bao tay đè bảng, chú thích tràn, mất dim hạ 10 mm…) |

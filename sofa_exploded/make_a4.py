@@ -108,7 +108,7 @@ def tbl(msp, x0, y_top, cols, rows, rh=50, title=None, h=1.5):
         for (_, w), cell in zip(cols, r):
             rect(msp, x, y - rh, x + w, y, layer="7-BANG-KE")
             s = str(cell)
-            maxc = int(w / (h * S * 0.72)) - 1
+            maxc = int(w / (h * S * 0.8)) - 1
             if len(s) > maxc > 3:
                 s = s[:maxc - 1] + "…"
             T(msp, s, (x + 10, y - rh / 2), h=h, layer="7-BANG-KE", align=TA.MIDDLE_LEFT)
@@ -1136,6 +1136,29 @@ def export_excel(c, path):
     wb.save(path)
 
 
+def render_pdf(docs, path, png=None):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    from ezdxf.addons.drawing import Frontend, RenderContext
+    from ezdxf.addons.drawing.config import BackgroundPolicy, Configuration
+    from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+    cfg = Configuration(background_policy=BackgroundPolicy.WHITE, lineweight_scaling=0.8)
+    if png:
+        os.makedirs(png, exist_ok=True)
+    with PdfPages(path) as pp:
+        for doc, p_, _ in docs:
+            fig = plt.figure(figsize=(11.69, 8.27))
+            ax = fig.add_axes([0, 0, 1, 1])
+            Frontend(RenderContext(doc), MatplotlibBackend(ax), config=cfg).draw_layout(doc.modelspace())
+            ax.set_xlim(0, PW); ax.set_ylim(0, PH); ax.set_aspect("equal"); ax.axis("off")
+            pp.savefig(fig)
+            if png:
+                fig.savefig(os.path.join(png, os.path.basename(p_)[:-4] + ".png"), dpi=150)
+            plt.close(fig)
+
+
 def build_all(params=None, proj="first", out="output", pdf=True, png=None):
     c = Ctx(params, proj)
     d4 = os.path.join(out, "A4")
@@ -1155,26 +1178,7 @@ def build_all(params=None, proj="first", out="output", pdf=True, png=None):
         docs.append((doc, path, name))
     export_excel(c, os.path.join(out, "SF_BOM.xlsx"))
     if pdf:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_pdf import PdfPages
-        from ezdxf.addons.drawing import Frontend, RenderContext
-        from ezdxf.addons.drawing.config import BackgroundPolicy, Configuration
-        from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
-        cfg = Configuration(background_policy=BackgroundPolicy.WHITE, lineweight_scaling=0.8)
-        if png:
-            os.makedirs(png, exist_ok=True)
-        with PdfPages(os.path.join(out, "SF_A4_BO-BAN-VE.pdf")) as pp:
-            for doc, path, _ in docs:
-                fig = plt.figure(figsize=(11.69, 8.27))
-                ax = fig.add_axes([0, 0, 1, 1])
-                Frontend(RenderContext(doc), MatplotlibBackend(ax), config=cfg).draw_layout(doc.modelspace())
-                ax.set_xlim(0, PW); ax.set_ylim(0, PH); ax.set_aspect("equal"); ax.axis("off")
-                pp.savefig(fig)
-                if png:
-                    fig.savefig(os.path.join(png, os.path.basename(path)[:-4] + ".png"), dpi=150)
-                plt.close(fig)
+        render_pdf(docs, os.path.join(out, "SF_A4_BO-BAN-VE.pdf"), png)
     return c, docs
 
 
@@ -1185,15 +1189,19 @@ def main():
     ap.add_argument("--out", default="output")
     ap.add_argument("--no-pdf", action="store_true")
     ap.add_argument("--png")
+    ap.add_argument("--full", action="store_true", help="xuất bộ chi tiết đầy đủ (mỗi chi tiết 1 trang)")
     a = ap.parse_args()
     prm = json.load(open(a.params, encoding="utf-8")) if a.params else None
-    c, docs = build_all(prm, a.projection, a.out, not a.no_pdf, a.png)
-    print(f"Đã tạo {len(docs)} trang A4 trong {a.out}/A4")
-    try:
-        import selfcheck
+    import selfcheck
+    if a.full:
+        c, docs = build_all(prm, a.projection, a.out, not a.no_pdf, a.png)
+        print(f"Đã tạo {len(docs)} trang A4 (bộ đầy đủ) trong {a.out}/A4")
         selfcheck.run(c, docs, a.out)
-    except ImportError:
-        pass
+    else:
+        import compact
+        c, docs = compact.build_compact(prm, a.projection, a.out, not a.no_pdf, a.png)
+        print(f"Đã tạo {len(docs)} trang A4 (bộ gọn) trong {a.out}/A4")
+        selfcheck.run_compact(c, docs, a.out)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ TỰ KIỂM TRA BỘ BẢN VẼ + CHẤM ĐIỂM /10
  10. Chi tiết cùng KT khác lỗ có ký hiệu phân biệt (mã chữ + cảnh báo)
 """
 import os
+from collections import Counter
 
 from ezdxf import bbox
 
@@ -177,6 +178,120 @@ def run(c, docs, out):
               f"Biến thể cùng KT khác lỗ: {', '.join(sib) or '—'}",
               f"Hướng nhìn phụ tự động ở trang cụm: " + ", ".join(f"{m}: {v[0] or 'không cần'}"
                                                              for m, v in c.report.get('aux', {}).items())]
+    with open(os.path.join(out, "TU-KIEM-TRA.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    return score, res
+
+
+def run_compact(c, docs, out):
+    """Tự kiểm tra bộ GỌN 5 trang."""
+    res = []
+    N = len(docs)
+    texts = {name: [e.dxf.text for e in doc.modelspace().query("TEXT")] for doc, _, name in docs}
+    tbl_txt = {name: " | ".join(e.dxf.text for e in doc.modelspace().query("TEXT") if e.dxf.layer == "7-BANG-KE")
+               for doc, _, name in docs}
+    # 1 A4 trong khung
+    bad = []
+    for doc, path, name in docs:
+        ents = [e for e in doc.modelspace() if not (e.dxf.layer == "0-KHUNG-BANVE" and e.dxftype() == "LWPOLYLINE")]
+        ext = bbox.extents(ents)
+        if ext.has_data and (ext.extmin.x < INNER[0] or ext.extmin.y < INNER[1] or ext.extmax.x > INNER[2]
+                             or ext.extmax.y > INNER[3]):
+            bad.append(f"{name} ({ext.extmin.x:.0f},{ext.extmin.y:.0f})–({ext.extmax.x:.0f},{ext.extmax.y:.0f})")
+    res.append(("Khổ A4, không lọt khung", 1 - len(bad) / N, bad))
+    # 2 chữ chồng chữ
+    bad = []
+    for doc, path, name in docs:
+        bx = [(_text_box(e), e.dxf.text) for e in doc.modelspace().query("TEXT")]
+        n, ex = 0, []
+        for i in range(len(bx)):
+            for j in range(i + 1, len(bx)):
+                if _overlap(bx[i][0], bx[j][0]) > 0.25:
+                    n += 1
+                    if len(ex) < 3:
+                        ex.append(f"'{bx[i][1][:16]}'×'{bx[j][1][:16]}'")
+        if n:
+            bad.append(f"{name}: {n} cặp ({'; '.join(ex)})")
+    res.append(("Không chữ chồng chữ", 1 - len(bad) / N, bad))
+    # 3 đúng 5 trang, mỗi cụm thuộc đúng 1 trang
+    pm = c.report.get("page_mods", {})
+    cover = Counter(m for mods in pm.values() for m in mods)
+    bad = ([f"có {N} trang"] if N != 5 else []) + [m for m in MODULES if cover.get(m) != 1]
+    res.append(("5 trang, mỗi cụm 1 trang", 1 - len(bad) / (len(MODULES) + 1), bad))
+    # 4 mọi chi tiết có trong bảng kê
+    bad = []
+    for key, mods in pm.items():
+        for code in {c.t2c[q.tag] for q in c.parts if q.module in mods}:
+            if code not in tbl_txt[key].split(" | "):
+                bad.append(f"{key}: thiếu {code}")
+    res.append(("Đủ chi tiết trong bảng kê", 1 - len(bad) / max(len(c.var), 1), bad))
+    # 5 số vị trí
+    bad = []
+    for key, labs in c.report.get("page_labels", {}).items():
+        have = {e.dxf.text for doc, _, nm in docs if nm == key for e in doc.modelspace().query("TEXT")
+                if e.dxf.layer == "5-SO-VI-TRI"}
+        bad += [f"{key}: thiếu số {l}" for l in labs if l not in have]
+    nl = sum(len(v) for v in c.report.get("page_labels", {}).values())
+    res.append(("Đủ số vị trí trên hình bung", 1 - len(bad) / max(nl, 1), bad))
+    # 6 không nét khuất
+    bad = [f"{name}: {len(doc.modelspace().query('*[layer==\"2-NET-KHUAT\"]'))}" for doc, _, name in docs
+           if len(doc.modelspace().query('*[layer=="2-NET-KHUAT"]'))]
+    res.append(("Không nét khuất", 1 - len(bad) / N, bad))
+    # 7 vát ghi góc trong bảng kê
+    from geom import angle_deg
+    bad, nsp = [], 0
+    for code, g in c.var.items():
+        P = g["poly"]
+        angs = {round(angle_deg(P[i - 1], P[i], P[(i + 1) % len(P)])) for i in range(len(P))} - {90, 180}
+        if angs and not g["metal"]:
+            nsp += 1
+            key = next(k for k, mods in pm.items() if g["module"] in mods)
+            if not any(f"{a}°" in tbl_txt[key] for a in angs):
+                bad.append(code)
+    res.append(("Vát / biên dạng có ghi góc", 1 - len(bad) / max(nsp, 1), bad))
+    # 8 lỗ khoan đủ trong Excel + bulông có chiều dài trên trang
+    from openpyxl import load_workbook
+    ws = load_workbook(os.path.join(out, "SF_BOM.xlsx"))["Lỗ khoan"]
+    nh = sum(len(g["holes"]) for g in c.var.values())
+    bad = [] if ws.max_row - 1 == nh else [f"Excel {ws.max_row - 1}/{nh} lỗ"]
+    for j in c.joints:
+        if j.hw in ("P8", "P6"):
+            key = next(k for k, mods in pm.items() if c.by[j.b].module in mods)
+            if f"×{j.length}" not in tbl_txt[key]:
+                bad.append(f"{key}: thiếu bulông ×{j.length}")
+    res.append(("Lỗ khoan (Excel) + chiều dài bulông", 1 - len(set(bad)) / 4, sorted(set(bad))))
+    # 9 quy tắc
+    bad = []
+    for j in c.joints:
+        if j.hw in ("P8", "P6") and BOLT_LEN.get(round(c.by[j.b].thick)) != j.length:
+            bad.append(f"{j.hw} {j.b}")
+    bad += [k for k in c.var if "CHƯA XÁC ĐỊNH" in c.material(k)]
+    res.append(("Quy tắc phụ kiện + vật liệu", 1 - len(bad) / max(len(c.var), 1), bad))
+    # 10 biến thể khác lỗ được ghi chú
+    sib = [k for k, g in c.var.items() if g["siblings"]]
+    bad = []
+    for code in sib:
+        key = next(k for k, mods in pm.items() if c.var[code]["module"] in mods)
+        if "khác lỗ" not in tbl_txt[key]:
+            bad.append(code)
+    res.append(("Biến thể khác lỗ có ghi chú", 1 - len(bad) / max(len(sib), 1), bad))
+    # 11 pát: khoanh vùng + chi tiết trong trang cụm
+    circ = c.report.get("circles", {})
+    bad = []
+    for d in c.details:
+        key = next(k for k, mods in pm.items() if c.by[d["main"]].module in mods)
+        got = {tg for _, tg in circ.get(f"page {key}", [])}
+        bad += [f"{key}: chưa khoanh {tg}" for tg, _ in d["points"] if tg not in got]
+        if d["label"] not in c.report.get("insets", []):
+            bad.append(f"thiếu chi tiết {d['label']}")
+    res.append(("Pát: khoanh vùng + chi tiết", 1 - len(bad) / max(len(c.detail_points) + len(c.details), 1), bad))
+
+    score = round(sum(max(0, r[1]) for r in res) / len(res) * 10, 2)
+    lines = [f"# TỰ KIỂM TRA BỘ GỌN – {N} trang A4", "", f"**ĐIỂM: {score} / 10**", "",
+             "| # | Tiêu chí | Điểm | Lỗi |", "|---|---|---|---|"]
+    for i, (nm, sc, bd) in enumerate(res, 1):
+        lines.append(f"| {i} | {nm} | {max(0, sc):.2f} | {'; '.join(map(str, bd[:6])) or '—'} |")
     with open(os.path.join(out, "TU-KIEM-TRA.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     print("\n".join(lines))
