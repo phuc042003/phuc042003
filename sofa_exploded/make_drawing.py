@@ -28,8 +28,8 @@ from ezdxf.enums import TextEntityAlignment
 from shapely.geometry import LineString, MultiPoint, Point, Polygon
 from shapely.ops import unary_union
 
-from sofa_model import (HARDWARE, MODULES, PART_TYPES, build, check_overlaps,
-                        explode_offset)
+from sofa_model import (HARDWARE, LEG_MODULE, MODULES, PART_TYPES, STEP_MODULES, build,
+                        check_overlaps, explode_offset)
 
 S = 10          # hệ số khổ giấy: bản vẽ vẽ 1:1 trong model, khung A1 phóng ×10 => tỉ lệ 1:10
 SHEET_W, SHEET_H = 841 * S, 594 * S
@@ -283,23 +283,37 @@ def place_balloons(anchors, outline, gap, r, iters=400):
         hp = hit if hit.geom_type == "Point" else list(hit.geoms)[0]
         svals[k] = ring.project(hp)
     keys = sorted(svals, key=svals.get)
-    s = [svals[k] for k in keys]
-    need = 2.7 * r
-    n = len(s)
-    if n * need > per:
-        need = per / n
-    for _ in range(iters):
-        moved = False
-        for i in range(n):
-            j = (i + 1) % n
-            d = (s[j] - s[i]) % per if n > 1 else per
-            if d < need - 1e-6:
-                f = (need - d) / 2
-                s[i] -= f
-                s[j] += f
-                moved = True
-        if not moved:
-            break
+    n = len(keys)
+    need = min(2.7 * r, per / max(n, 1))
+    # cắt vòng tại khe hở lớn nhất -> bài toán 1D
+    sv = [svals[k] for k in keys]
+    gaps = [((sv[(i + 1) % n] - sv[i]) % per, i) for i in range(n)]
+    cut = max(gaps)[1] + 1
+    keys = keys[cut:] + keys[:cut]
+    want = []
+    for k in keys:
+        v = svals[k]
+        if want and v < want[-1]:
+            v += per
+        want.append(v)
+    # gộp cụm: mỗi cụm là dãy liên tiếp cách đều need, tâm = trung bình vị trí mong muốn
+    clusters = [[i] for i in range(n)]
+    def place(c):
+        mean = sum(want[i] for i in c) / len(c)
+        start = mean - need * (len(c) - 1) / 2
+        return start, start + need * (len(c) - 1)
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(clusters) - 1):
+            if place(clusters[i])[1] + need > place(clusters[i + 1])[0] + 1e-6:
+                clusters[i] = clusters[i] + clusters.pop(i + 1)
+                changed = True
+                break
+    s = []
+    for c in clusters:
+        st, _ = place(c)
+        s += [st + need * j for j in range(len(c))]
     return {k: tuple(ring.interpolate(v % per).coords[0]) for k, v in zip(keys, s)}
 
 
@@ -312,11 +326,8 @@ def sheet_outline(v, vis):
 
 
 def part_numbers(parts):
-    nums = OrderedDict()
-    for q in parts:
-        if q.ptype not in nums:
-            nums[q.ptype] = len(nums) + 1
-    return nums
+    used = {q.ptype for q in parts}
+    return OrderedDict((t, i + 1) for i, t in enumerate([t for t in PART_TYPES if t in used]))
 
 
 def draw_ortho(msp, p, parts, proj):
@@ -405,10 +416,12 @@ def draw_exploded(msp, p, parts, joints, nums, region):
 
 def draw_step(msp, p, parts, joints, nums, step, region, title, lines):
     """Hình bước lắp: cụm đã lắp xám, chi tiết mới màu + bung + mũi tên."""
-    mods_upto = {1: {"M1"}, 2: {"M1", "M2", "M3"}, 3: {"M1", "M2", "M3", "M4"},
-                 4: {"M1", "M2", "M3", "M4", "M5"}}
-    new = mods_upto[step] - (mods_upto.get(step - 1, set()))
-    level = "part" if step == 1 else "module"
+    mods_upto, acc = {}, set()
+    for i, (mods, _) in enumerate(STEP_MODULES):
+        acc |= set(mods)
+        mods_upto[i + 1] = set(acc)
+    new = set(STEP_MODULES[step - 1][0])
+    level = STEP_MODULES[step - 1][1]
     items, offs = [], {}
     by_tag = {q.tag: q for q in parts}
     for q in parts:
@@ -416,7 +429,7 @@ def draw_step(msp, p, parts, joints, nums, step, region, title, lines):
             continue
         if q.module in new:
             o = explode_offset(q, p, level)
-            if step == 4:
+            if q.module == LEG_MODULE:
                 o = (0, 0, -p["ex_leg"] * 0.8)
             items.append((q.tag, shift(q.box, o), mod_layer(q.module)))
         else:
@@ -442,7 +455,7 @@ def draw_step(msp, p, parts, joints, nums, step, region, title, lines):
         c = [sum((q.box[i] + q.box[i + 3]) / 2 for q in qs) / len(qs) for i in range(3)]
         a = v.P(tuple(c[i] + o[i] * 1.0 for i in range(3)))
         b = v.P(tuple(c[i] + o[i] * 0.35 for i in range(3)))
-        if step == 1:
+        if level == "part":
             continue
         arrow(msp, a, b)
     # số vị trí chi tiết mới
@@ -463,7 +476,7 @@ def draw_step(msp, p, parts, joints, nums, step, region, title, lines):
     tx, ty = region[0], region[1] - 90
     msp.add_circle((tx + 55, ty + 15), 55, dxfattribs={"layer": "6-CHU", "color": 1})
     text(msp, str(step), (tx + 55, ty + 15), h=6, align=TextEntityAlignment.MIDDLE_CENTER, color=1)
-    text(msp, title, (tx + 140, ty), h=3.5)
+    text(msp, title, (tx + 130, ty), h=3.0)
     mtext(msp, "\\P".join(lines), (tx, ty - 90), h=2.5, width=region[2] - region[0])
 
 
@@ -560,29 +573,32 @@ def draw_frame(msp, p, proj):
 def notes(msp, pos):
     s = ("GHI CHÚ / NOTES:\\P"
          "1. Kích thước trong bản vẽ là tham số MẪU – phải đối chiếu mẫu thật trước khi sản xuất.\\P"
-         "2. Màu theo cụm: xanh dương = khung ngồi, xanh lá = tay vịn, tím = khung tựa, cam = chân.\\P"
-         "3. Nét chấm gạch xanh = đường bung, chỉ vị trí & phương lắp phụ kiện (lục giác A..E).\\P"
+         "2. Màu theo cụm: xanh dương = khung đáy, xanh nhạt = khung ngồi, xanh lá = gác tay,\\P"
+         "    tím = tựa lưng, cam = chân.\\P"
+         "3. Nét chấm gạch xanh = đường bung, chỉ vị trí & phương lắp phụ kiện (lục giác A..F).\\P"
          "4. Liên kết chốt (B) bôi keo PVA, kẹp ép ≥ 30 phút; bulông KD (A) chỉ siết sau khi\\P"
-         "    đã lắp đủ cụm, kiểm tra vuông góc (đo 2 đường chéo khung ngồi lệch ≤ 2 mm).")
+         "    đã lắp đủ cụm, kiểm tra vuông góc (đo 2 đường chéo khung đáy lệch ≤ 2 mm).")
     mtext(msp, s, pos, h=2.4, width=1800)
 
 
 STEPS = [
-    ("LẮP KHUNG NGỒI (M1) / SEAT FRAME",
-     ["Ghép giằng 3, 4 vào đà trước 1 và đà sau 2 bằng chốt B + keo;",
-      "bắt thêm vít C ở 2 giằng đầu. Bắt ke góc 5 bằng vít E (2 vít/ke).",
-      "Kiểm tra vuông góc khung bằng đo chéo."]),
-    ("LẮP TAY VỊN (M2, M3) / ARMS",
-     ["Ghép trụ 6, giằng 8, 9 và thanh tay 7 bằng chốt B + keo.",
-      "Áp tay vịn vào 2 đầu khung ngồi, bắt bulông KD A",
-      "(6 bộ/tay): 2 vào đà trước, 2 vào đà sau, 2 vào giằng đầu."]),
-    ("LẮP KHUNG TỰA (M4) / BACK FRAME",
-     ["Ghép thanh đứng 12 với thanh tựa 10, 11 bằng chốt B + keo.",
-      "Hạ khung tựa lên đà sau 2, bắt bulông A vào trụ tay sau",
-      "(2 bộ/bên), vít C từ trên xuống đà sau."]),
-    ("LẮP CHÂN (M5) / LEGS",
-     ["Lật úp khung lên mặt phẳng có lót. Vặn 6 chân 13 bằng",
-      "bulông treo D vào tán cấy sẵn. Lật lại, kiểm tra cân bằng,",
+    ("KHUNG ĐÁY (M1) / BASE FRAME",
+     ["Ghép giằng 3, 4 vào đà đáy trước 1 và đà đáy sau 2 bằng chốt B + keo;",
+      "vít C ở 2 giằng đầu. Bắt ke góc 5 bằng vít E. Đo chéo kiểm tra vuông."]),
+    ("GÁC TAY (M3, M4) / ARMS",
+     ["Ghép trụ 9, giằng 11, 12 và thanh 10 bằng chốt B + keo.",
+      "Áp gác tay vào 2 đầu khung đáy, bắt bulông A (6 bộ/bên)."]),
+    ("KHUNG NGỒI (M2) / SEAT FRAME",
+     ["Ghép thanh 6, 7 bằng chốt B; bắt nan 8 bằng vít C.",
+      "Đặt lên khung đáy, vít F xuống đà/giằng đáy,",
+      "bulông A qua trụ gác tay trước (1 bộ/bên)."]),
+    ("TỰA LƯNG (M5) / BACK FRAME",
+     ["Ghép thanh đứng 15 với thanh 13, 14 bằng chốt B + keo.",
+      "Đặt lên đà đáy sau 2, bulông A vào trụ gác tay sau",
+      "(2 bộ/bên), vít C xuống đà đáy sau."]),
+    ("CHÂN (M6) / LEGS",
+     ["Lật úp sofa lên mặt phẳng có lót, vặn 6 chân 16",
+      "bằng bulông treo D. Lật lại, kiểm tra cân bằng,",
       "siết chặt toàn bộ bulông A."]),
 ]
 
@@ -601,7 +617,7 @@ def make(params=None, proj="first", outdir="output"):
     text(msp, "HÌNH BUNG TỔNG THỂ / EXPLODED ISOMETRIC VIEW (không theo tỉ lệ)", (4350, 5680), h=4.0)
     text(msp, "BƯỚC LẮP RÁP / ASSEMBLY SEQUENCE", (300, 1960), h=4.0)
     msp.add_line((250, 2040), (6330, 2040), dxfattribs={"layer": "0-KHUNG-BANVE"})
-    sw = (6330 - 280) / 4
+    sw = (6330 - 280) / len(STEPS)
     for i, (title, lines) in enumerate(STEPS):
         x = 280 + i * sw
         draw_step(msp, p, parts, joints, nums, i + 1, region=(x + 20, 600, x + sw - 40, 1880),
