@@ -71,6 +71,7 @@ def setup():
     doc = md.setup_doc()
     doc.layers.add(METAL_LAYER, color=1, lineweight=35)
     doc.layers.add("12-GOC-VAT", color=1, lineweight=25)
+    doc.layers.add("13-KHOANH-VUNG", color=1, lineweight=35, linetype="DASHED")
     ds = doc.dimstyles.new("A4")
     for k, v in dict(dimscale=S, dimtxt=1.6, dimasz=1.4, dimexe=1.0, dimexo=0.8, dimgap=0.5, dimdec=1,
                      dimzin=8, dimtad=1, dimtxsty="VN", dimclrd=1, dimclre=1, dimclrt=7).items():
@@ -267,7 +268,7 @@ def ortho(msp, parts, region, proj, kmax=10, chain=True, hidden=False, pad=(320,
 
 # ================================================================== hình trục đo + hướng nhìn phụ
 def draw_iso(msp, c, offs, region, labels, dirs=MAIN_ISO, square=(), gray=(), margin=150, joint_filter=None,
-             r=32, gap=100, only_labels=None, title=None):
+             r=32, gap=100, only_labels=None, title=None, circles=None, ckey=None):
     shown = [q for q in c.parts if q.tag in offs]
     it = items_of(shown, off=lambda q: offs[q.tag], layer=lambda q: layer_of(q, gray=q.tag in gray))
     v = R.fit(R.iso_dirs(*dirs), [s for _, s, _ in it], region, margin)
@@ -303,9 +304,28 @@ def draw_iso(msp, c, offs, region, labels, dirs=MAIN_ISO, square=(), gray=(), ma
     for m_, hw in tags_pos:
         if all(math.dist(m_, b_) > r + 40 for b_ in bpos):
             hw_tag(msp, m_, hw)
+    if circles is None:
+        circles = [pt for pt in c.detail_points if pt[1] in offs]
+    for lab, tg, pt in circles:
+        if tg not in offs:
+            continue
+        o = offs[tg]
+        cen = v.P(tuple(pt[i] + o[i] for i in range(3)))
+        draw_khoanh(msp, cen, lab)
+        if ckey:
+            c.report.setdefault("circles", {}).setdefault(ckey, []).append((lab, tg))
     if title:
         T(msp, title, (region[0] + 10, region[3] - 10), h=1.8)
     return v, vt
+
+
+def draw_khoanh(msp, cen, lab, R=62):
+    """Vòng khoanh vùng chỗ lắp pát + ký hiệu chi tiết."""
+    msp.add_circle(cen, R, dxfattribs={"layer": "13-KHOANH-VUNG"})
+    q = (cen[0] + R * 0.72 + 30, cen[1] + R * 0.72 + 30)
+    msp.add_line((cen[0] + R * 0.72, cen[1] + R * 0.72), q, dxfattribs={"layer": "13-KHOANH-VUNG"})
+    rect(msp, q[0] - 4, q[1] - 22, q[0] + 50, q[1] + 22, layer="13-KHOANH-VUNG")
+    T(msp, lab, (q[0] + 23, q[1]), h=1.9, align=TA.MIDDLE_CENTER, layer="13-KHOANH-VUNG", color=1)
 
 
 def hidden_labels(c, offs, labels, dirs=MAIN_ISO, thr=0.15):
@@ -341,6 +361,8 @@ class Ctx:
         self.nums = md.part_numbers(self.parts)
         self.var, self.t2c, self.problems = variants(self.parts, self.joints, self.nums)
         self.report = {}
+        self.details = detail_specs(self)
+        self.detail_points = [(d["label"], tg, pt) for d in self.details for tg, pt in d["points"]]
 
     def codes_of(self, ptype):
         return "/".join(c for c, g in self.var.items() if g["ptype"] == ptype)
@@ -373,7 +395,7 @@ def pg_overview_views(c, msp):
     rect(msp, *region, layer="7-BANG-KE")
     offs = {q.tag: (0, 0, 0) for q in c.parts}
     draw_iso(msp, c, offs, (region[0] + 10, region[1] + 10, region[2] - 10, region[3] - 60), OrderedDict(),
-             dirs=(-1, 1, 1), margin=40)
+             dirs=(-1, 1, 1), margin=40, circles=[])
     T(msp, "HƯỚNG NHÌN PHỤ: từ SAU-TRÁI-TRÊN (thấy ván lưng, pát nối)", (region[0] + 15, region[3] - 45), h=1.6)
     T(msp, "Không vẽ nét khuất; nét đỏ = sắt; kích thước là tham số MẪU.", (250, 140), h=1.5)
     c.report.setdefault("assembly_pages", []).append("overview_views")
@@ -389,13 +411,14 @@ def pg_overview_exploded(c, msp):
             labels[code] = g["tags"]
     hid = hidden_labels(c, offs, labels)
     main = (250, 420, 2150, PH - 150) if not hid else (250, 760, 2150, PH - 150)
-    draw_iso(msp, c, offs, main, labels, r=38, gap=110)
+    draw_iso(msp, c, offs, main, labels, r=38, gap=110, ckey="overview_exploded")
     if hid:
         d = best_aux(c, offs, labels, hid)
         reg = (250, 420, 2150, 740)
         rect(msp, *reg, layer="7-BANG-KE")
         gray = {q.tag for q in c.parts if not any(q.tag in labels[h] for h in hid)}
         draw_iso(msp, c, offs, (reg[0], reg[1], reg[2], reg[3] - 50), labels, dirs=d, gray=gray, only_labels=hid,
+                 circles=[],
                  r=30, gap=70, margin=60, title=f"HƯỚNG NHÌN PHỤ ({R.ISO_NAMES.get(d, '')}): " + ", ".join(hid))
     rows = [[m, f"{i['vn']} / {i['en']}"] for m, i in MODULES.items()]
     rows += [[code, f"{PART_TYPES[g['ptype']][0]} (sắt)"] for code, g in c.var.items() if g["metal"]]
@@ -429,7 +452,8 @@ def draw_step(c, msp, step, region):
             gray.add(q.tag)
     newtags = [q.tag for q in c.parts if q.module in new]
     draw_iso(msp, c, offs, region, c.labels_for(newtags), square=c.square_set(), gray=gray, margin=110,
-             joint_filter=lambda j: j.step == step, r=30, gap=75)
+             joint_filter=lambda j: j.step == step, r=30, gap=75, ckey=f"step {step}",
+             circles=[p_ for p_ in c.detail_points if p_[1] in newtags])
 
 
 def pg_steps(c, msp, steps):
@@ -518,42 +542,6 @@ def pg_hardware(c, msp):
     return "PHỤ KIỆN – QUY TẮC – VẬT LIỆU", "HARDWARE / RULES / MATERIALS", "—"
 
 
-def pg_metal(c, msp):
-    """Lắp sắt: chỉ hình lắp + ghi chú (không xuất hình chiếu chi tiết pát)."""
-    seat = [q for q in c.parts if q.module == "M2"]
-    offs = {q.tag: ((0, 0, 0) if q.ptype not in METAL_TYPES else q.part_off) for q in seat}
-    gray = {q.tag for q in seat if q.ptype not in METAL_TYPES}
-    lab = c.labels_for([q.tag for q in seat if q.ptype in METAL_TYPES])
-    for cd in [c.t2c["seat_front"], c.t2c["seat_side_L"]]:
-        lab[cd] = c.var[cd]["tags"]
-    draw_iso(msp, c, offs, (250, 900, 1500, PH - 150), lab, gray=gray, margin=110,
-             joint_filter=lambda j: j.hw in ("P8", "P6", "H", "K"), r=30, gap=75,
-             title="1) PÁT L + THANH GIA CỐ TRONG KHUNG NGỒI (M2)")
-    corner = [q for q in c.parts if q.tag in ("armL_post_B", "back_panel", "fpat_L", "stile_0", "back_bot",
-                                               "back_top", "armL_top", "armL_mid", "armL_bot", "arm_panel_L")]
-    offs2 = {q.tag: ((0, 120, 0) if q.ptype == "pat_flat" else (0, 0, 0)) for q in corner}
-    gray2 = {q.tag for q in corner if q.ptype != "pat_flat"}
-    draw_iso(msp, c, offs2, (1550, 900, PW - 120, PH - 150), c.labels_for(["fpat_L", "back_panel", "armL_post_B"]),
-             dirs=(-1, 1, 1), gray=gray2, margin=110, joint_filter=lambda j: j.hw in ("P8", "G"), r=30, gap=75,
-             title="2) PÁT NỐI TỰA–TAY (nhìn từ sau-trái)")
-    p = c.p
-    j8 = next(j for j in c.joints if j.hw == "P8" and j.b == "seat_front")
-    j6 = next(j for j in c.joints if j.hw == "P6")
-    jf = next(j for j in c.joints if j.hw == "P8" and j.b == "back_panel")
-    MT(msp, "HƯỚNG DẪN LẮP SẮT:\\P"
-            f"1. Pát L {c.codes_of('pat_L')} (4 góc trong khung ngồi, bước 3): mép trên thấp hơn mặt khung "
-            f"{p['pat_drop']:g} mm. Cánh áp thanh trước/sau: {hw_name(j8)}, ốc 4 chấu đóng từ mặt trong ván. "
-            f"Cánh áp thanh hông: {hw_name(j6)}, vặn ốc cấy vào ván trước.\\P"
-            f"2. Thanh gia cố {c.codes_of('steel_bar')} (thép hộp {p['bar_w']:g}×{p['bar_h']:g}): mặt {p['bar_h']:g} "
-            "đứng, giữa chiều sâu khung, mặt trên phẳng đáy nan; 2 bulông H M6×70 xuyên thanh hông vào đai ốc hàn. "
-            "Bắt nan xong mới bắn vít tự khoan K (1 vít/nan).\\P"
-            f"3. Pát nối {c.codes_of('pat_flat')} (bước 4, mặt sau): 2 vít G 4×20 vào trụ gác tay sau; "
-            f"{hw_name(jf)} vào ván lưng 9 mm (ốc 4 chấu ở mặt trước ván, giữa 2 thanh đứng).\\P"
-            "4. Sắt sơn tĩnh điện; không hàn tại chỗ.", (250, 860), h=1.6, width=1100)
-    c.report.setdefault("assembly_pages", []).append("metal")
-    return "LẮP SẮT – PÁT L, THANH GIA CỐ, PÁT NỐI", "STEEL PARTS – INSTALLATION", "không TL"
-
-
 # ================================================================== trang CỤM (1 cụm = 1 trang)
 def pg_module(c, msp, m):
     mine = [q for q in c.parts if q.module == m]
@@ -571,7 +559,8 @@ def pg_module(c, msp, m):
     main = (250, 640, 1820, PH - 150) if not hid else (250, 1020, 1820, PH - 150)
     i = MODULES[m]
     draw_iso(msp, c, offs, main, labels, square=c.square_set(), gray=gray, joint_filter=jf, r=32, gap=100,
-             title=f"HÌNH BUNG LẮP RÁP CỤM {m} – {i['vn'].upper()}")
+             title=f"HÌNH BUNG LẮP RÁP CỤM {m} – {i['vn'].upper()}", ckey=f"module {m}",
+             circles=[p_ for p_ in c.detail_points if p_[1] in offs and c.by[p_[1]].module == m])
     aux_used = None
     if hid:
         d = best_aux(c, offs, labels, hid)
@@ -580,7 +569,7 @@ def pg_module(c, msp, m):
         rect(msp, *reg, layer="7-BANG-KE")
         g2 = set(gray) | {q.tag for q in mine if not any(q.tag in labels[h] for h in hid)}
         draw_iso(msp, c, offs, (reg[0], reg[1], reg[2], reg[3] - 45), labels, dirs=d, square=c.square_set(),
-                 gray=g2, only_labels=hid, r=28, gap=60, margin=50,
+                 gray=g2, only_labels=hid, r=28, gap=60, margin=50, circles=[],
                  title=f"HƯỚNG NHÌN PHỤ ({R.ISO_NAMES.get(d, '')}) – chi tiết bị che: " + ", ".join(hid))
     x0 = 1860
     s, _ = ortho(msp, mine, (x0, 1400, PW - 190, PH - 140), c.proj, kmax=1, chain=False,
@@ -812,6 +801,267 @@ def pg_part(c, msp, code):
     return f"VT {code} – {name.upper()}", f"{PART_TYPES[g['ptype']][1].upper()} – MACHINING", stxt
 
 
+# ================================================================== KHOANH VÙNG & CHI TIẾT PÁT SẮT
+def _clip_poly(poly, x0, y0, x1, y1):
+    def clip(pts, inside, inter):
+        out = []
+        for i in range(len(pts)):
+            a, b = pts[i - 1], pts[i]
+            ia, ib = inside(a), inside(b)
+            if ib:
+                if not ia:
+                    out.append(inter(a, b))
+                out.append(b)
+            elif ia:
+                out.append(inter(a, b))
+        return out
+
+    def ix(xc):
+        return lambda a, b: (xc, a[1] + (b[1] - a[1]) * (xc - a[0]) / (b[0] - a[0]))
+
+    def iy(yc):
+        return lambda a, b: (a[0] + (b[0] - a[0]) * (yc - a[1]) / (b[1] - a[1]), yc)
+
+    pts = list(poly)
+    for ins, inter in ((lambda p: p[0] >= x0, ix(x0)), (lambda p: p[0] <= x1, ix(x1)),
+                       (lambda p: p[1] >= y0, iy(y0)), (lambda p: p[1] <= y1, iy(y1))):
+        if not pts:
+            break
+        pts = clip(pts, ins, inter)
+    return pts if len(pts) >= 3 and abs(sum(pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0]
+                                            * pts[i][1] for i in range(len(pts)))) > 1e-6 else None
+
+
+def clip_part(q, box):
+    """Giao lăng trụ chi tiết với hộp box -> danh sách Solid (vùng gỗ quanh pát)."""
+    from geom import AX, prism_solid
+    ia, ib, it = AX[q.plane]
+    t0, t1 = max(q.t0, box[it]), min(q.t1, box[it + 3])
+    if t1 - t0 < 0.05:
+        return []
+    out = []
+    for pc in (q.pieces or [q.poly]):
+        cp = _clip_poly(pc, box[ia], box[ib], box[ia + 3], box[ib + 3])
+        if cp:
+            out.append(prism_solid(q.plane, cp, t0, t1))
+    return out
+
+
+def detail_specs(c):
+    p, by = c.p, {q.tag: q for q in c.parts}
+    specs = []
+    pat = [q for q in c.parts if q.ptype == "pat_L"]
+    if pat:
+        q = by["pat_LF"]
+        b = q.box
+        specs.append(dict(
+            label="A", short="Pat L goc khung ngoi", main="pat_LF", title="PÁT L – GÓC TRONG KHUNG NGỒI",
+            points=[(x.tag, _center(x)) for x in pat],
+            crop=(b[0] - 40, b[1] - 22, b[2] - 15, b[3] + 35, b[4] + 35, b[5] + 22),
+            views=[("top", "MẶT BẰNG – nhìn từ trên"), ("back", "NHÌN TỪ TRONG RA THANH TRƯỚC")],
+            explode=(45, 45, 60)))
+    fp = [q for q in c.parts if q.ptype == "pat_flat"]
+    if fp:
+        q = by["fpat_L"]
+        b = q.box
+        specs.append(dict(
+            label="B", short="Pat noi tua tay", main="fpat_L", title="PÁT NỐI TỰA LƯNG – GÁC TAY (MẶT SAU)",
+            points=[(x.tag, _center(x)) for x in fp],
+            crop=(b[0] - 10, b[1] - 60, b[2] - 30, b[3] + 15, b[4] + 5, b[5] + 30),
+            views=[("back", "NHÌN TỪ SAU"), ("top", "MẶT BẰNG – nhìn từ trên")],
+            explode=(0, 70, 0)))
+    if "steel_bar" in by:
+        q = by["steel_bar"]
+        b = q.box
+        jH = [j for j in c.joints if j.hw == "H"]
+        specs.append(dict(
+            label="C", short="Dau thanh gia co", main="steel_bar", title="ĐẦU THANH GIA CỐ – BẮT VÀO THANH HÔNG",
+            points=[("steel_bar", j.pts[0]) for j in jH],
+            crop=(b[0] - 35, b[1] - 40, b[2] - 15, b[0] + 90, b[4] + 40, b[5] + 25),
+            views=[("front", "NHÌN TỪ TRƯỚC (mặt cắt qua tâm thanh)"), ("top", "MẶT BẰNG – nhìn từ trên")],
+            explode=(70, 0, 0)))
+    return specs
+
+
+def _center(q):
+    b = q.box
+    return tuple((b[k] + b[k + 3]) / 2 for k in range(3))
+
+
+def _fit_std(dirs, solids, region, margin, kmax=20):
+    v0 = R.View(dirs)
+    pts = [v0.p2(pt) for s_ in solids for pt in s_.verts]
+    u0, u1 = min(x for x, _ in pts), max(x for x, _ in pts)
+    w0, w1 = min(y for _, y in pts), max(y for _, y in pts)
+    W_, H_ = region[2] - region[0] - 2 * margin, region[3] - region[1] - 2 * margin
+    k, st = SCALES[-1]
+    for kk, t in SCALES:
+        if kk <= kmax and kk * (u1 - u0) <= W_ and kk * (w1 - w0) <= H_:
+            k, st = kk, t
+            break
+    cx, cy = (region[0] + region[2]) / 2, (region[1] + region[3]) / 2
+    return R.View(dirs, (cx - k * (u0 + u1) / 2, cy - k * (w0 + w1) / 2), k), st, (u0, u1, w0, w1)
+
+
+def _detail_joints(c, d):
+    tags = {d["main"]}
+    return [j for j in c.joints if (j.a in tags or j.b in tags) and
+            any(all(d["crop"][k] - 1 <= pt[k] <= d["crop"][k + 3] + 1 for k in range(3)) for pt in j.pts)]
+
+
+def _hole_mark(msp, pos, num):
+    msp.add_circle(pos, 11, dxfattribs={"layer": "10-PHU-KIEN"})
+    msp.add_line((pos[0] - 16, pos[1]), (pos[0] + 16, pos[1]), dxfattribs={"layer": "10-PHU-KIEN"})
+    msp.add_line((pos[0], pos[1] - 16), (pos[0], pos[1] + 16), dxfattribs={"layer": "10-PHU-KIEN"})
+    q = (pos[0] + 34, pos[1] + 30)
+    msp.add_circle(q, 17, dxfattribs={"layer": "10-PHU-KIEN"})
+    T(msp, str(num), q, h=1.5, align=TA.MIDDLE_CENTER, layer="10-PHU-KIEN", color=1)
+
+
+def pg_pat_overview(c, msp):
+    offs = {q.tag: (0, 0, 0) for q in c.parts}
+    gray = {q.tag for q in c.parts if q.ptype not in METAL_TYPES}
+    draw_iso(msp, c, offs, (250, 420, 1750, PH - 150), OrderedDict(), gray=gray, margin=120, ckey="pat_overview",
+             circles=[x for x in c.detail_points if x[0] != "B"],
+             title="KHOANH VÙNG CHỖ LẮP SẮT – nhìn trước-phải-trên")
+    draw_iso(msp, c, offs, (1800, 1150, PW - 120, PH - 150), OrderedDict(), dirs=(-1, 1, 1), gray=gray, margin=90,
+             ckey="pat_overview", circles=[x for x in c.detail_points if x[0] == "B"],
+             title="Nhìn sau-trái-trên (pát nối ở mặt sau)")
+    rows = []
+    for i, d in enumerate(c.details):
+        js = _detail_joints(c, d)
+        hw = "; ".join(sorted({hw_name(j).split(" (")[0] for j in js}))
+        rows.append([d["label"], d["title"].split(" – ")[0].title(), len(d["points"]), hw[:70],
+                     str(c.detail_page.get(d["label"], ""))])
+    tbl(msp, 1800, 1080, [("CT", 80), ("Chi tiết", 330), ("SL", 70), ("Phụ kiện cố định", 500), ("Tờ", 80)],
+        rows, 50, "BẢNG CHI TIẾT LẮP SẮT", h=1.35)
+    MT(msp, "Vòng đỏ nét đứt = vùng lắp pát sắt, ký hiệu trong ô = tên hình chi tiết phóng to ở các trang sau. "
+            "Các vị trí cùng ký hiệu giống nhau (đối xứng trái/phải, trước/sau). Gỗ vẽ xám, sắt vẽ đỏ.",
+       (1800, 700), h=1.5, width=1060)
+    c.report["pat_overview"] = True
+    return "VỊ TRÍ LẮP PÁT SẮT – KHOANH VÙNG", "STEEL BRACKET LOCATIONS", "không TL"
+
+
+def pg_detail(c, msp, d):
+    box = d["crop"]
+    near = []
+    for q in c.parts:
+        sols = clip_part(q, box)
+        if sols:
+            near.append((q, sols))
+    main = c.by[d["main"]]
+    js = _detail_joints(c, d)
+    groups = OrderedDict()
+    for j in js:
+        groups.setdefault(hw_name(j), []).append(j)
+    num_of = {id(j): i + 1 for i, (k, lst) in enumerate(groups.items()) for j in lst}
+    items = [(f"{q.tag}#{i}", s_, layer_of(q, plain=True) if q.ptype not in METAL_TYPES else METAL_LAYER)
+             for q, sols in near for i, s_ in enumerate(sols)]
+    regions = [(230, 1090, 1180, 1900), (1200, 1090, 2150, 1900)]
+    stx = []
+    for (vk, vname), reg in zip(d["views"], regions):
+        v, st, ext = _fit_std(R.ORTHO[vk], [s_ for _, s_, _ in items], reg, 100, kmax=10)
+        stx.append(st)
+        R.render(msp, v, items)
+        u0, u1, w0, w1 = ext
+        a, b = v.sheet((u0, w0)), v.sheet((u1, w1))
+        rect(msp, a[0] - 25, a[1] - 25, b[0] + 25, b[1] + 25, layer="13-KHOANH-VUNG")
+        T(msp, f"CHI TIẾT {d['label']} – {vname} ({st})", (reg[0], reg[3] - 5), h=1.6)
+        # dim định vị pát + lỗ
+        pu = [v.p2(pt) for s_ in main.solids for pt in s_.verts]
+        cu = [v.p2(pt) for s_ in [s for q, ss in near if q.tag == main.tag for s in ss] for pt in s_.verts] or pu
+        mu0, mu1 = min(x for x, _ in cu), max(x for x, _ in cu)
+        mw0, mw1 = min(y for _, y in cu), max(y for _, y in cu)
+        hp = [v.p2(pt) for j in js for pt in j.pts]
+        hs = [v.sheet(h_) for h_ in hp]
+        placed = []
+        for j in js:
+            for pt in j.pts:
+                sp = v.P(pt)
+                if all(math.dist(sp, q_) > 25 for q_ in placed):      # lỗ trùng hướng nhìn -> 1 dấu
+                    placed.append(sp)
+                    _hole_mark(msp, sp, num_of[id(j)])
+        k = v.scale
+        xs = sorted({round(x, 1) for x in [mu0, mu1] + [h_[0] for h_ in hp] if mu0 - 0.1 <= x <= mu1 + 0.1})
+        ys = sorted({round(y, 1) for y in [mw0, mw1] + [h_[1] for h_ in hp] if mw0 - 0.1 <= y <= mw1 + 0.1})
+        mates = {j.a for j in js} | {j.b for j in js}
+        mates.discard(main.tag)
+        ref_pts = [v.p2(pt) for q, ss in near if q.tag in mates for s_ in ss for pt in s_.verts]
+        top_ref = max(y for _, y in ref_pts) if ref_pts else mw1        # mặt trên thanh nhận pát
+        if top_ref - mw1 > 0.5:
+            ys.append(round(top_ref, 1))
+        xs = chain_edges(xs, k, 45) or xs
+        ys = chain_edges(ys, k, 45) or ys
+        by0 = v.sheet((0, w0))[1] - 95
+        for p0, p1 in zip(xs, xs[1:]):
+            dim(msp, (0, by0), v.sheet((p0, mw0)), v.sheet((p1, mw0)), k)
+        bx0 = v.sheet((u1, 0))[0] + 95
+        for p0, p1 in zip(ys, ys[1:]):
+            dim(msp, (bx0, 0), v.sheet((mu1, p0)), v.sheet((mu1, p1)), k, 90)
+    # hình trục đo bung nhẹ pát
+    offs = {q.tag: (d["explode"] if q.tag == main.tag else (0, 0, 0)) for q, _ in near}
+    it = [(f"{q.tag}#{i}", s_.moved(offs[q.tag]), METAL_LAYER if q.ptype in METAL_TYPES else "8-CUM-DA-LAP")
+          for q, sols in near for i, s_ in enumerate(sols)]
+    v = R.fit(R.iso_dirs(*(MAIN_ISO if d["label"] != "B" else (-1, 1, 1))), [s_ for _, s_, _ in it],
+              (2150, 1120, PW - 120, 1890), 110)
+    R.render(msp, v, it)
+    iso_pl = []
+    for j in js:
+        for pt in j.pts:
+            a = v.P(tuple(pt[i] + offs.get(j.a, (0, 0, 0))[i] for i in range(3)))
+            b = v.P(tuple(pt[i] + offs.get(j.b, (0, 0, 0))[i] for i in range(3)))
+            msp.add_line(a, b, dxfattribs={"layer": "4-DUONG-BUNG"})
+            q_ = a if j.a != main.tag else b
+            if all(math.dist(q_, z_) > 25 for z_ in iso_pl):
+                iso_pl.append(q_)
+                _hole_mark(msp, q_, num_of[id(j)])
+    T(msp, f"CHI TIẾT {d['label']} – TRỤC ĐO (bung pát)", (2160, 1885), h=1.6)
+    # bảng chỗ bắn + ghi chú
+    rows = []
+    for i, (nm, lst) in enumerate(groups.items(), 1):
+        j0 = lst[0]
+        other = j0.b if j0.a == main.tag else j0.a
+        oq = c.by[other]
+        hole = HOLE_SPEC[(j0.hw, "b" if j0.b == other else "a")]
+        rows.append([str(i), nm.replace("Ø", "%%c"), f"{c.t2c.get(other, '')} {PART_TYPES[oq.ptype][0]}"[:30],
+                     hole[1].replace("Ø", "%%c")[:42], sum(len(j.pts) for j in lst)])
+    y = tbl(msp, 250, 1020, [("Số", 70), ("Phụ kiện bắn cố định", 600), ("Bắn vào", 390), ("Lỗ trên gỗ", 540),
+                             ("SL", 80)], rows, 50, f"CHỖ BẮN CỐ ĐỊNH PÁT – CHI TIẾT {d['label']}", h=1.35)
+    MT(msp, detail_note(c, d), (250, y - 40), h=1.5, width=1080)
+    loc = (2020, 420, PW - 120, 1000)
+    rect(msp, *loc, layer="7-BANG-KE")
+    allo = {q.tag: (0, 0, 0) for q in c.parts}
+    draw_iso(msp, c, allo, (loc[0], loc[1], loc[2], loc[3] - 40), OrderedDict(),
+             dirs=MAIN_ISO if d["label"] != "B" else (-1, 1, 1),
+             gray={q.tag for q in c.parts if q.ptype not in METAL_TYPES}, margin=40,
+             circles=[x for x in c.detail_points if x[0] == d["label"]])
+    T(msp, f"Vị trí chi tiết {d['label']} trong sofa ({len(d['points'])} chỗ)", (loc[0] + 10, loc[3] - 15), h=1.4)
+    c.report.setdefault("details", {})[d["label"]] = dict(holes=sum(len(j.pts) for j in js), groups=len(groups))
+    return f"CHI TIẾT {d['label']} – {d['title']}", "STEEL BRACKET DETAIL", " / ".join(dict.fromkeys(stx))
+
+
+def detail_note(c, d):
+    p = c.p
+    if d["label"] == "A":
+        return ("CÁCH LẮP (bước 3, lắp sau khi ghép khung ngồi, trước khi bắt nan):\\P"
+                f"• Áp pát sát góc trong, mép trên pát thấp hơn mặt khung {p['pat_drop']:g} mm.\\P"
+                f"• (1) Cánh áp thanh trước/sau {c.codes_of('seat_fb')}: khoan Ø10 xuyên ván 18, đóng ốc 4 chấu M8 "
+                "từ MẶT NGOÀI ván, bắn bulông từ phía pát.\\P"
+                f"• (2) Cánh áp thanh hông {c.codes_of('seat_side')}: khoan Ø8, vặn ốc cấy M6 từ phía pát, bắn bulông.\\P"
+                "• Kiểm tra vuông góc khung rồi mới siết chặt. 4 góc giống nhau (đối xứng).").replace("Ø", "%%c")
+    if d["label"] == "B":
+        return ("CÁCH LẮP (bước 4, sau khi đặt tựa lưng):\\P"
+                "• Áp pát phẳng lên mặt sau, nửa trái phủ trụ gác tay sau, nửa phải phủ ván lưng.\\P"
+                "• (1) Bắn 2 vít gỗ vào trụ gác tay sau (khoan mồi Ø2.5 sâu 15).\\P"
+                f"• (2) Ván lưng {p['back_panel_t']:g} mm: khoan Ø10 xuyên, ốc 4 chấu M8 đặt ở MẶT TRƯỚC ván "
+                "(khoảng trống giữa 2 thanh đứng), bắn bulông từ phía pát.\\P"
+                "• Bên phải đối xứng.").replace("Ø", "%%c")
+    return ("CÁCH LẮP (bước 3):\\P"
+            "• Đặt thanh thép hộp mặt 40 đứng, giữa chiều sâu khung ngồi, mặt trên phẳng với đáy nan.\\P"
+            "• (1) Khoan Ø7 xuyên thanh hông, bắn bulông M6×70 vào đai ốc hàn sẵn ở đầu thanh. 2 đầu giống nhau.\\P"
+            "• Sau khi bắt nan: bắn vít tự khoan 4.2×25 qua mỗi nan xuống thanh (1 vít/nan, ngoài vùng chi tiết).").replace("Ø", "%%c")
+
+
 # ================================================================== lắp ráp bộ trang
 def page_list(c):
     pages = [("TONG-THE_HINH-CHIEU", pg_overview_views, ()), ("TONG-THE_HINH-BUNG", pg_overview_exploded, ()),
@@ -822,12 +1072,15 @@ def page_list(c):
     for i, ch in enumerate(chunks):
         pages.append((f"BOM_{i + 1}", pg_bom, (ch, i + 1, len(chunks))))
     pages.append(("PHU-KIEN_QUY-TAC", pg_hardware, ()))
-    pages.append(("LAP-SAT", pg_metal, ()))
+    pages.append(("VI-TRI-PAT-SAT", pg_pat_overview, ()))
+    for d in c.details:
+        pages.append((f"CHI-TIET-{d['label']}_{ascii_name(d['short'])}", pg_detail, (d,)))
     for m in MODULES:
         pages.append((f"CUM-{m}_{ascii_name(MODULES[m]['vn'])}", pg_module, (m,)))
     for code, g in c.var.items():
         if not g["metal"]:
             pages.append((f"VT{code}_{ascii_name(PART_TYPES[g['ptype']][0])}", pg_part, (code,)))
+    c.detail_page = {nm.split("_")[0][9:]: i + 1 for i, (nm, _, _) in enumerate(pages) if nm.startswith("CHI-TIET-")}
     return pages
 
 

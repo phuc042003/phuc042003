@@ -152,7 +152,23 @@ def run(c, docs, out):
                 bad10.append(k)
     res.append(("Biến thể khác lỗ có ký hiệu", 1 - len(bad10) / max(len(sib), 1), bad10))
 
-    score = round(sum(max(0, r[1]) for r in res), 2)
+    # 11. khoanh vùng + chi tiết pát sắt
+    bad11 = []
+    circ = c.report.get("circles", {})
+    metal_tags = [q.tag for q in c.parts if q.ptype in ("pat_L", "pat_flat", "steel_bar")]
+    ov = {tg for _, tg in circ.get("pat_overview", [])}
+    bad11 += [f"chưa khoanh {t_} ở trang vị trí pát" for t_ in metal_tags if t_ not in ov]
+    for m in ("M2", "M5"):
+        mt = {tg for _, tg in circ.get(f"module {m}", [])}
+        need = [q.tag for q in c.parts if q.module == m and q.tag in metal_tags]
+        bad11 += [f"trang cụm {m} chưa khoanh {t_}" for t_ in need if t_ not in mt]
+    for d in c.details:
+        info = c.report.get("details", {}).get(d["label"])
+        if not info or not info["holes"]:
+            bad11.append(f"chi tiết {d['label']} thiếu chỗ bắn")
+    res.append(("Khoanh vùng + chi tiết pát", 1 - len(bad11) / max(len(metal_tags) * 2, 1), bad11))
+
+    score = round(sum(max(0, r[1]) for r in res) / len(res) * 10, 2)
     lines = [f"# TỰ KIỂM TRA BỘ BẢN VẼ – {N} trang A4", "", f"**ĐIỂM: {score} / 10**", "",
              "| # | Tiêu chí | Điểm | Lỗi |", "|---|---|---|---|"]
     for i, (nm, sc, bad) in enumerate(res, 1):

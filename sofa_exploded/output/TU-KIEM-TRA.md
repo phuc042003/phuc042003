@@ -1,4 +1,4 @@
-# TỰ KIỂM TRA BỘ BẢN VẼ – 40 trang A4
+# TỰ KIỂM TRA BỘ BẢN VẼ – 43 trang A4
 
 **ĐIỂM: 10.0 / 10**
 
@@ -14,6 +14,7 @@
 | 8 | Lỗ có bảng toạ độ + dim | 1.00 | — |
 | 9 | Quy tắc phụ kiện + vật liệu | 1.00 | — |
 | 10 | Biến thể khác lỗ có ký hiệu | 1.00 | — |
+| 11 | Khoanh vùng + chi tiết pát | 1.00 | — |
 
 Chi tiết biên dạng đặc biệt: 5, 16
 Biến thể cùng KT khác lỗ: 6A, 6B, 12A, 12B, 12C, 12D, 14A, 14B, 19A, 19B, 19C

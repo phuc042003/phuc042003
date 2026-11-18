@@ -8,7 +8,7 @@ python make_a4.py --params my_sofa.json  # kích thước thật (chỉ ghi kho�
 Kết quả: `output/A4/*.dxf` (mỗi trang 1 file A4), `output/SF_A4_BO-BAN-VE.pdf`, `output/SF_BOM.xlsx`,
 `output/TU-KIEM-TRA.md` (điểm /10). Tiến độ làm việc: `CHECKLIST.md`.
 
-## Bộ trang (40 trang với tham số mẫu)
+## Bộ trang (43 trang với tham số mẫu)
 | Trang | Nội dung |
 |---|---|
 | 01 | Tổng thể: 3 hình chiếu KHÔNG nét khuất + hướng nhìn phụ từ phía sau |
@@ -16,9 +16,10 @@ Kết quả: `output/A4/*.dxf` (mỗi trang 1 file A4), `output/SF_A4_BO-BAN-VE.
 | 03–04 | 5 bước lắp, mỗi bước kèm danh sách phụ kiện + chiều dài bulông |
 | 05–06 | BOM theo mã (vật liệu theo quy tắc ván ép/LVL) |
 | 07 | Phụ kiện, **quy tắc bulông theo ván**, tổng hợp vật liệu, ký hiệu lỗ |
-| 08 | Lắp sắt: pát L, thanh gia cố, pát nối (chỉ hình lắp + ghi chú, không vẽ chi tiết pát) |
-| 09–14 | **Mỗi cụm 1 trang**: hình bung lớn, KT bao, bảng kê, phụ kiện, hướng dẫn |
-| 15–40 | Mỗi chi tiết gỗ 1 trang: biên dạng, **góc vát**, dim tổng, dim vị trí lỗ, Ø, bảng toạ độ, ký hiệu biến thể |
+| 08 | **Vị trí pát sắt – khoanh vùng** (vòng đỏ + ký hiệu A/B/C) |
+| 09–11 | **Chi tiết A/B/C phóng to 1:2**: vùng gỗ quanh pát, dim định vị, đánh số chỗ bắn, bảng phụ kiện, cách lắp |
+| 12–17 | **Mỗi cụm 1 trang** (có khoanh vùng pát): hình bung lớn, KT bao, bảng kê, phụ kiện, hướng dẫn |
+| 18–43 | Mỗi chi tiết gỗ 1 trang: biên dạng, **góc vát**, dim tổng, dim vị trí lỗ, Ø, bảng toạ độ, ký hiệu biến thể |
 
 ## Quy tắc
 - Vật liệu: dày 3–18 mm = ván ép, ≥ 20 mm = LVL.

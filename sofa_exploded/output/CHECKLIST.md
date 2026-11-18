@@ -15,3 +15,13 @@ Quy tắc: làm xong + tự kiểm 1 bước mới đánh dấu [x] và sang bư
 | B9 | Trang tổng: hình chiếu không nét khuất + hướng nhìn phụ, bước lắp, BOM, phụ kiện + bảng quy tắc | [x] | trang 01–08 |
 | B10 | Tự kiểm tra tự động + chấm điểm /10, sửa đến ≥ 9/10 | [x] | selfcheck.py: lần 1 = 9.55 → lần 2 = 9.9 → lần 3 = **10.0/10** (output/TU-KIEM-TRA.md) |
 | B11 | Xem ảnh từng trang, commit + push, báo cáo | [x] | Chấm trực quan ≈ 9.3/10: thanh 1870 vẽ 1:20; vài nhãn lỗ sát nhau ở ván lưng/đà đáy (vẫn đọc được) |
+
+## Vòng 6 – Khoanh vùng pát sắt + hình chi tiết phóng to
+
+| # | Bước | Trạng thái | Kiểm chứng |
+|---|---|---|---|
+| C1 | Cắt vùng 3D quanh pát (clip lăng trụ theo hộp) để vẽ riêng phần gỗ gần pát | [x] | clip_part() trong make_a4.py |
+| C2 | Khoanh vùng (vòng tròn đỏ + ký hiệu A/B/C) trên trang tổng hình bung, trang cụm M2/M5, bước lắp 3/4 | [x] | trang 02, 03–04, 13, 16 |
+| C3 | Trang "Vị trí pát sắt": hình tổng có khoanh vùng mọi vị trí + bảng chi tiết | [x] | trang 08: 4×A, 2×B, 2×C |
+| C4 | Mỗi chi tiết A/B/C 1 trang: 2 hình chiếu phóng to + hình trục đo, dim định vị pát & lỗ, chỉ chỗ bắn bulông/vít, ghi chú | [x] | trang 09–11, tỉ lệ 1:2; A: hạ 10 mm, lỗ 17.5/20/12.5 |
+| C5 | Tự kiểm tra (thêm tiêu chí khoanh vùng + chi tiết pát) ≥ 9/10, xem ảnh, commit | [x] | 11 tiêu chí: 9.96 → **10.0/10**; đã xem ảnh trang 08–11 |
