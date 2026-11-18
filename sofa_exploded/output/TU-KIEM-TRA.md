@@ -15,3 +15,4 @@
 | 9 | Quy tắc phụ kiện + vật liệu | 1.00 | — |
 | 10 | Biến thể khác lỗ có ghi chú | 1.00 | — |
 | 11 | Pát: khoanh vùng + chi tiết | 1.00 | — |
+| 12 | Ô gia công từng chi tiết trong trang cụm | 1.00 | — |

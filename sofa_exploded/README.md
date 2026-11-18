@@ -9,14 +9,14 @@ python make_a4.py --params my_sofa.json  # kích thước thật
 Kết quả: `output/A4/SF-01…05_*.dxf`, `output/SF_5TRANG_BAN-VE.pdf`, `output/SF_BOM.xlsx` (BOM + toạ độ lỗ khoan),
 `output/TU-KIEM-TRA.md`.
 
-## Bộ gọn 5 trang
+## Bộ gọn 5 trang (1 cụm = 1 trang chứa toàn bộ lắp ráp + chi tiết)
 | Trang | Nội dung |
 |---|---|
 | SF-01 Tổng thể | Hình chiếu KT bao, hình bung nhãn cụm + khoanh pát, trình tự lắp, tổng phụ kiện cả bộ |
-| SF-02 Gác tay | Hình bung tay trái + phải, KT bao, bảng kê (vát 41°, khác lỗ), phụ kiện |
-| SF-03 Tựa lưng | Hình bung + **chi tiết B** pát nối (khoanh vùng, dim, chỗ bắn) |
-| SF-04 Khung ngồi | Hình bung + **chi tiết A** pát L góc + **chi tiết C** đầu thanh gia cố |
-| SF-05 Khung đáy + chân | Hình bung, KT bao, bảng kê, phụ kiện |
+| SF-02 Gác tay | Hình bung tay trái + phải, bảng kê (vát 41°, khác lỗ), phụ kiện, **ô gia công 10 chi tiết** |
+| SF-03 Tựa lưng | Hình bung, bảng kê, phụ kiện, **ô gia công 6 chi tiết** + chi tiết pát B |
+| SF-04 Khung ngồi | Hình bung, bảng kê, phụ kiện, **ô gia công 4 chi tiết** + chi tiết pát A, C |
+| SF-05 Khung đáy + chân | Hình bung, bảng kê, phụ kiện, **ô gia công 6 chi tiết** |
 
 ## Quy tắc
 - Vật liệu: dày 3–18 mm = ván ép, ≥ 20 mm = LVL.

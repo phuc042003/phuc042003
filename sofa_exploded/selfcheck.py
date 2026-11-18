@@ -287,6 +287,12 @@ def run_compact(c, docs, out):
             bad.append(f"thiếu chi tiết {d['label']}")
     res.append(("Pát: khoanh vùng + chi tiết", 1 - len(bad) / max(len(c.detail_points) + len(c.details), 1), bad))
 
+    # 12 mọi chi tiết gỗ có ô gia công trên trang cụm
+    cells = c.report.get("cells", set())
+    wood = [k for k, g in c.var.items() if not g["metal"]]
+    bad = [k for k in wood if k not in cells]
+    res.append(("Ô gia công từng chi tiết trong trang cụm", 1 - len(bad) / max(len(wood), 1), bad))
+
     score = round(sum(max(0, r[1]) for r in res) / len(res) * 10, 2)
     lines = [f"# TỰ KIỂM TRA BỘ GỌN – {N} trang A4", "", f"**ĐIỂM: {score} / 10**", "",
              "| # | Tiêu chí | Điểm | Lỗi |", "|---|---|---|---|"]

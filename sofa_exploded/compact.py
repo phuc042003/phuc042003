@@ -178,12 +178,99 @@ def pg_overall(c, msp):
     return s
 
 
+def part_cell(c, msp, code, region):
+    """Ô chi tiết gia công thu gọn: biên dạng + dim tổng + dim vị trí lỗ + ký hiệu lỗ + góc vát."""
+    from holes import face_name, hole_desc
+    from geom import angle_deg
+    g = c.var[code]
+    L, W, T = g["dims"]
+    poly, holes = g["poly"], g["holes"]
+    x0, y0, x1, y1 = region
+    A.rect(msp, x0, y0, x1, y1, layer="7-BANG-KE")
+    sq = bool(g["siblings"])
+    cc = (x0 + 38, y1 - 36)
+    if sq:
+        A.rect(msp, cc[0] - 26, cc[1] - 22, cc[0] + 26, cc[1] + 22, layer="5-SO-VI-TRI")
+    else:
+        msp.add_circle(cc, 25, dxfattribs={"layer": "5-SO-VI-TRI"})
+    A.T(msp, code, cc, h=1.7 if len(code) < 3 else 1.4, align=TA.MIDDLE_CENTER, layer="5-SO-VI-TRI")
+    name = PART_TYPES[g["ptype"]][0]
+    mat = c.material(code).replace(" (ngoại lệ – xác nhận)", "*")
+    maxc = int((x1 - x0 - 90) / (13 * 0.72))
+    A.T(msp, f"{name} – SL {len(g['tags'])}"[:maxc], (x0 + 75, y1 - 30), h=1.3)
+    line2 = f"{L:.4g}×{W:.4g}×{T:.4g} – {mat}" + (f" – KHÁC LỖ {'/'.join(s for s in g['siblings'] if s != code)}"
+                                                  if sq else "")
+    A.T(msp, line2[:int((x1 - x0 - 90) / (11 * 0.72))], (x0 + 75, y1 - 62), h=1.1, color=1 if sq else None)
+    # vùng hình
+    nleg = len({(h[0], face_name(h[1], h[2], g["dims"])[0]) for h in holes if h[0] not in ("K2", "H2", "PM")})
+    leg_h = 26 * min(3, (nleg + 2) // 3) + 18
+    ax0, ay0, ax1, ay1 = x0 + 75, y0 + leg_h + 70, x1 - 55, y1 - 120
+    k, st = A.pick_scale(ax1 - ax0, ay1 - ay0, L, W, kmax=10)
+    fx = (ax0 + ax1) / 2 - k * L / 2
+    fy = (ay0 + ay1) / 2 - k * W / 2
+    msp.add_lwpolyline([(fx + k * u, fy + k * v) for u, v in poly], close=True, dxfattribs={"layer": "1-NET-THAY"})
+    A.dim(msp, (fx, fy + k * W + 35), (fx, fy + k * W), (fx + k * L, fy + k * W), k)
+    A.dim(msp, (fx - 40, fy), (fx, fy), (fx, fy + k * W), k, 90)
+    A.T(msp, f"({st})", (x1 - 12, y1 - 95), h=1.1, align=TA.RIGHT)
+    rect_like = len(poly) == 4 and all(abs(angle_deg(poly[i - 1], poly[i], poly[(i + 1) % 4]) - 90) < .5
+                                       for i in range(4))
+    if not rect_like:
+        A.angle_marks(msp, poly, fx, fy, k)
+    through = {cd for (cd, _d, _dia, dep) in HOLE_SPEC.values() if dep == "xuyên"}
+    us, legend = [], OrderedDict()
+    for cd, n, (u, v, w) in holes:
+        if cd in ("K2", "H2", "PM"):
+            continue
+        fn = face_name(n, (u, v, w), g["dims"])
+        dia = hole_desc(cd)[1]
+        if fn == "A":
+            A.hole_symbol(msp, (fx + k * u, fy + k * v), dia, k, cd in through)
+        elif fn == "B":                         # lỗ mặt B: nét liền + gạch chéo (không dùng nét khuất)
+            pc, rr = (fx + k * u, fy + k * v), max(dia * k / 2, 8)
+            msp.add_circle(pc, rr, dxfattribs={"layer": "10-PHU-KIEN"})
+            msp.add_line((pc[0] - rr * .7, pc[1] - rr * .7), (pc[0] + rr * .7, pc[1] + rr * .7),
+                         dxfattribs={"layer": "10-PHU-KIEN"})
+        else:                                   # lỗ trên cạnh / đầu: ô vuông nhỏ trên đường biên
+            if fn in ("C", "D"):
+                p = (fx + k * u, fy + (k * W if fn == "C" else 0))
+            else:
+                p = (fx + (0 if fn.startswith("E") else k * L), fy + k * v)
+            A.rect(msp, p[0] - 7, p[1] - 7, p[0] + 7, p[1] + 7, layer="10-PHU-KIEN")
+        us.append(u)
+        legend.setdefault((cd, fn[0]), [0, dia])[0] += 1
+    ch = A.chain_edges(us + [0, L], k, 75) if us else None
+    if ch and len(ch) > 2:
+        for p0, p1 in zip(ch, ch[1:]):
+            A.dim(msp, (0, fy - 38), (fx + k * p0, fy), (fx + k * p1, fy), k)
+    items = [f"{cd}×{n} %%c{dia:g} {fc}" for (cd, fc), (n, dia) in legend.items()]
+    per = max(1, int((x1 - x0 - 30) / (11 * 0.62 * 17)))
+    yy = y0 + leg_h - 22
+    for i in range(0, min(len(items), per * 3), per):
+        A.T(msp, "  ".join(items[i:i + per]), (x0 + 15, yy), h=1.05, layer="10-PHU-KIEN")
+        yy -= 26
+    c.report.setdefault("cells", set()).add(code)
+
+
+def grid(region, spans, rows=None):
+    tot = sum(spans)
+    rows = rows or (1 if tot <= 3 else 2)
+    per = math.ceil(tot / rows)
+    x0, y0, x1, y1 = region
+    cw, rh = (x1 - x0) / per, (y1 - y0) / rows
+    out, col, row = [], 0, 0
+    for sp in spans:
+        if col + sp > per:
+            col, row = 0, row + 1
+        out.append((x0 + col * cw + 6, y1 - (row + 1) * rh + 6, x0 + (col + sp) * cw - 6, y1 - row * rh - 6))
+        col += sp
+    return out
+
+
 def pg_module(c, msp, key, mods):
     mine = [q for q in c.parts if q.module in mods]
     tags = [q.tag for q in mine]
     offs = {q.tag: solo_offset(q) for q in mine}
-    gray = set()
-    if key == "GAC-TAY":                                    # đặt tay phải sát tay trái cho gọn
+    if key == "GAC-TAY":
         sh = -(c.p["W"] - 1000)
         for q in mine:
             if q.module == "M4":
@@ -192,30 +279,34 @@ def pg_module(c, msp, key, mods):
         for q in mine:
             if q.module == "M6":
                 offs[q.tag] = (0, 0, -c.p["ex_leg"])
-    details = [d for d in c.details if c.by[d["main"]].module in mods]
-    main_reg = (250, 420, 1750, PH - 130) if not details else (250, 1110, 1750, PH - 130)
+    # bảng (phải trên)
+    x0 = 1400
+    y = A.tbl(msp, x0, 1950, [("VT", 85), ("Tên chi tiết", 330), ("SL", 50), ("L×W×T", 240), ("Vật liệu", 230),
+                              ("Ghi chú", 535)], part_rows(c, tags), 33, "BẢNG KÊ CHI TIẾT", h=1.15)
+    y = A.tbl(msp, x0, y - 55, [("Mã", 75), ("Phụ kiện (chiều dài bulông theo ván)", 1220), ("SL", 175)],
+              hw_rows(c, mods), 33, "PHỤ KIỆN", h=1.15)
+    note = " ".join(dict.fromkeys(c.step_text(STEP_OF[m] - 1)[1] for m in mods))
+    bb = A.bbox_parts(mine)
+    A.MT(msp, f"KT bao cụm: {bb[3] - bb[0]:.0f} × {bb[4] - bb[1]:.0f} × {bb[5] - bb[2]:.0f} mm. CÁCH LẮP: " + note,
+         (x0, y - 25), h=1.1, width=1460)
+    grid_top = min(y - 150, 1230)
+    # hình bung (trái trên)
     labels = c.labels_for(tags)
     jf = lambda j: c.by[j.a].module in mods and c.by[j.b].module in mods
-    A.draw_iso(msp, c, offs, main_reg, labels, square=c.square_set(), gray=gray, joint_filter=jf, r=32, gap=95,
-               margin=130, ckey=f"page {key}", circles=[p for p in c.detail_points if p[1] in offs],
-               title=f"HÌNH BUNG LẮP RÁP – {TITLE[key]}"
-                     + (" (tay phải vẽ dời sát tay trái)" if key == "GAC-TAY" else ""))
-    if details:
-        n = len(details)
-        w = 1500 / n
-        for i, d in enumerate(details):
-            vk = d["views"] if n == 1 else d["views"][:1] if d["label"] == "C" else d["views"]
-            ww = w if n == 1 else (950 if d["label"] == "A" else 550)
-            xa = 250 if (n == 1 or d["label"] == "A") else 250 + 950 + 10
-            detail_inset(c, msp, d, (xa, 420, xa + ww - (0 if n == 1 or d["label"] != "A" else 0), 1090), vk)
-    if key == "GAC-TAY":
-        y = right_column(c, msp, mods, tags, ortho_tags=[q.tag for q in mine if q.module == "M3"],
-                         cap="TAY TRÁI (tay phải đối xứng) ")
-    else:
-        y = right_column(c, msp, mods, tags)
-    note = " ".join(dict.fromkeys(c.step_text(STEP_OF[m] - 1)[1] for m in mods))
-    if y - 60 > 420:
-        A.MT(msp, "CÁCH LẮP: " + note, (1790, y - 40), h=1.2, width=1080)
+    A.draw_iso(msp, c, offs, (250, grid_top + 20, 1370, PH - 130), labels, square=c.square_set(), joint_filter=jf,
+               r=28, gap=75, margin=95, ckey=f"page {key}", circles=[p for p in c.detail_points if p[1] in offs],
+               title="HÌNH BUNG LẮP RÁP" + (" (tay phải vẽ dời sát tay trái)" if key == "GAC-TAY" else ""))
+    # lưới chi tiết (dưới)
+    codes = [cd for cd in OrderedDict.fromkeys(c.t2c[t] for t in tags) if not c.var[cd]["metal"]]
+    details = [d for d in c.details if c.by[d["main"]].module in mods]
+    spans = [1] * len(codes) + [2] * len(details)
+    cells = grid((250, 420, PW - 120, grid_top), spans)
+    A.T(msp, "CHI TIẾT GIA CÔNG (toạ độ đầy đủ từng lỗ: Excel sheet 'Lỗ khoan')   Ký hiệu: tròn + = xuyên, tròn chấm = "
+             "lỗ tịt mặt A, tròn gạch chéo = lỗ mặt B, ô vuông = lỗ trên cạnh/đầu", (250, grid_top + 8), h=1.15)
+    for cd, reg in zip(codes, cells):
+        part_cell(c, msp, cd, reg)
+    for d, reg in zip(details, cells[len(codes):]):
+        detail_inset(c, msp, d, reg, d["views"])
     c.report.setdefault("page_tags", {})[key] = tags
     c.report.setdefault("page_labels", {})[key] = list(labels)
     c.report.setdefault("page_mods", {})[key] = mods

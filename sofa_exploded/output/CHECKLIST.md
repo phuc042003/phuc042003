@@ -34,3 +34,11 @@ Quy tắc: làm xong + tự kiểm 1 bước mới đánh dấu [x] và sang bư
 | D2 | Trang 2 Gác tay (trái + phải), Trang 3 Tựa lưng (+ chi tiết pát B), Trang 4 Khung ngồi (+ chi tiết A, C), Trang 5 Khung đáy (+ chân) | [x] | SF-02…05 |
 | D3 | Mỗi trang cụm: hình bung lớn, KT bao, bảng kê (vật liệu, khác lỗ, vát 41°), phụ kiện + chiều dài bulông | [x] | bảng kê ghi 'khác lỗ', 'vát 41°/139°', 'vát 45°' |
 | D4 | Tự kiểm tra cho chế độ 5 trang ≥ 9/10, xem ảnh, commit | [x] | 11 tiêu chí = 10.0/10; xem ảnh sửa thêm 5 lỗi (KT bao tay đè bảng, chú thích tràn, mất dim hạ 10 mm…) |
+
+## Vòng 8 – 1 cụm = 1 trang chứa TOÀN BỘ (lắp ráp + bảng + chi tiết gia công)
+
+| # | Bước | Trạng thái | Kiểm chứng |
+|---|---|---|---|
+| E1 | Ô chi tiết gia công thu gọn: biên dạng, dim tổng, dim vị trí lỗ, lỗ mặt/cạnh/đầu, góc vát, mã biến thể | [x] | compact.part_cell() |
+| E2 | Bố cục trang cụm: hình bung + bảng kê/phụ kiện + lưới ô chi tiết + ô chi tiết pát | [x] | SF-02…05 |
+| E3 | Tự kiểm tra thêm tiêu chí "mọi chi tiết gỗ có ô gia công trên trang cụm" ≥ 9/10, xem ảnh, commit | [x] | 12 tiêu chí: 9.33 (lỗ mặt B nét đứt) → 10.0/10; xem ảnh: giãn dim chuỗi thanh dài |
