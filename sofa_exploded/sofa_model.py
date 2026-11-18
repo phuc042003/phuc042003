@@ -115,6 +115,7 @@ class Part:
     box: tuple               # (x0, y0, z0, x1, y1, z1)
     part_off: tuple = (0, 0, 0)    # bung cấp chi tiết (part-level explode)
     follow: str = None       # chân đi theo cụm nào khi bung (vd chân góc theo gác tay)
+    solo_off: tuple = None   # bung riêng trong bản vẽ từng cụm (None = dùng part_off)
 
     @property
     def size(self):
@@ -190,8 +191,8 @@ def build(p=None):
     # ---------------- M3/M4 GÁC TAY ----------------
     zt0 = p["H_arm"] - p["arm_top_h"]
     for side, mod, (ax0, ax1) in (("L", "M3", (0, Ta)), ("R", "M4", (W - Ta, W))):
-        add(f"arm{side}_post_F", "arm_post", mod, (ax0, 0, Hl, ax1, Pd, zt0))
-        add(f"arm{side}_post_B", "arm_post", mod, (ax0, D - Pd, Hl, ax1, D, zt0))
+        add(f"arm{side}_post_F", "arm_post", mod, (ax0, 0, Hl, ax1, Pd, zt0), solo_off=(0, -250, 0))
+        add(f"arm{side}_post_B", "arm_post", mod, (ax0, D - Pd, Hl, ax1, D, zt0), solo_off=(0, 250, 0))
         add(f"arm{side}_top", "arm_top", mod, (ax0, 0, zt0, ax1, D, p["H_arm"]), part_off=(0, 0, p["ex_top"]))
         add(f"arm{side}_bot", "arm_bot", mod, (ax0, Pd, Hl, ax1, D - Pd, Hl + p["arm_bot_h"]))
         add(f"arm{side}_mid", "arm_mid", mod,
@@ -246,6 +247,10 @@ def build(p=None):
         for pst in ("F", "B"):
             y0 = Pd * 0.3 if pst == "F" else D - Pd * 0.7
             J("B", f"arm{side}_post_{pst}", f"arm{side}_top", [(xm, y0, zt0), (xm, y0 + Pd * 0.4, zt0)], step=2)
+            yf = Pd if pst == "F" else D - Pd
+            for rail, z0r, hr in (("bot", Hl, p["arm_bot_h"]), ("mid", p["arm_mid_z"], p["arm_mid_h"])):
+                J("B", f"arm{side}_post_{pst}", f"arm{side}_{rail}",
+                  [(xm, yf, z0r + hr * 0.3), (xm, yf, z0r + hr * 0.7)], step=2)
         J("A", f"arm{side}_post_F", "base_front", [(xa, rt / 2, zc - 40), (xa, rt / 2, zc + 40)], step=2)
         J("A", f"arm{side}_post_B", "base_back", [(xa, D - rt / 2, zc - 40), (xa, D - rt / 2, zc + 40)], step=2)
         J("A", f"arm{side}_bot", f"base_end_{side}",
@@ -297,6 +302,11 @@ def explode_offset(part, p, level="full"):
     if level == "part":
         return part.part_off
     return tuple(a + b for a, b in zip(base, part.part_off))
+
+
+def solo_offset(part):
+    """Vector bung trong bản vẽ riêng của cụm."""
+    return part.solo_off if part.solo_off is not None else part.part_off
 
 
 def check_overlaps(parts, tol=0.01):

@@ -558,7 +558,7 @@ def draw_frame(msp, p, proj):
          (x0 + 40, y0 + 370), h=2.3)
     cells = [("Tỉ lệ / Scale", "1:10 (3D: không TL)"), ("Khổ / Size", "A1  841×594"),
              ("Đơn vị / Unit", "mm"), ("Người vẽ / Drawn", ""), ("Ngày / Date", ""),
-             ("Số BV / Dwg No.", "SF-KHUNG-001")]
+             ("Số BV / Dwg No.", "SF-KHUNG-00")]
     for i, (k, val) in enumerate(cells):
         cx = x0 + 600 * (i % 3) + 25
         cy = y0 + 280 - 140 * (i // 3)
