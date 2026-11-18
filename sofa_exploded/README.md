@@ -1,61 +1,42 @@
-# Bóc tách lắp ráp khung sofa – bản vẽ bung thông minh (Smart exploded assembly drawing)
+# Bóc tách lắp ráp khung sofa – bộ bản vẽ A4 tự động
 
-Sinh **một bản vẽ A1 (DXF)** cho khung sofa, nhìn vào là hiểu cách lắp:
-
-| Vùng bản vẽ | Nội dung |
-|---|---|
-| Trái trên | 3 hình chiếu vuông góc 1:10 (đứng / bằng / cạnh), **có nét khuất**, kích thước bao |
-| Phải trên | **Hình bung trục đo tổng thể** – màu theo cụm, số vị trí bám viền, đường bung (chấm gạch) chỉ vị trí phụ kiện, nhãn lục giác A..F |
-| Dưới | **5 bước lắp** (khung đáy → gác tay → khung ngồi → tựa lưng → chân): cụm đã lắp màu xám, cụm mới màu + mũi tên chiều lắp + hướng dẫn |
-| Phải dưới | Bảng kê chi tiết, bảng phụ kiện (số lượng tự đếm từ liên kết), ghi chú, khung tên, ký hiệu phép chiếu |
-
-## Bộ bản vẽ xuất ra (mỗi cụm 1 bản vẽ)
-| File | Nội dung |
-|---|---|
-| `SF-00_TONG-THE.dxf` (A1) | Tổng thể: hình chiếu, hình bung tổng, 5 bước lắp, BOM toàn bộ |
-| `SF-01_M1_KHUNG-DAY.dxf` (A2) | Cụm khung đáy |
-| `SF-02_M2_KHUNG-NGOI.dxf` (A2) | Cụm khung ngồi |
-| `SF-03_M3_GAC-TAY-TRAI.dxf` (A2) | Cụm gác tay trái |
-| `SF-04_M4_GAC-TAY-PHAI.dxf` (A2) | Cụm gác tay phải |
-| `SF-05_M5_TUA-LUNG.dxf` (A2) | Cụm tựa lưng |
-| `SF-06_M6_CHAN.dxf` (A2) | Cụm chân (+ chi tiết chân 1:2) |
-| `SF_BO-BAN-VE.pdf` | Gộp 7 tờ để in / gửi |
-| `SF_BOM.xlsx` | BOM VN/EN/CN + phụ kiện + tham số |
-
-Mỗi bản vẽ cụm: 3 hình chiếu 1:10 có nét khuất + kích thước bao + kích thước chuỗi vị trí thanh;
-hình bung cụm (số vị trí đồng bộ với SF-00, đường bung, nhãn phụ kiện); sơ đồ vị trí cụm trong sofa;
-bảng kê chi tiết cụm; bảng phụ kiện ghi rõ *nội bộ cụm* hay *liên kết với cụm nào*; hướng dẫn lắp; khung tên.
+Sinh **toàn bộ bản vẽ khổ A4 ngang (297×210)**, mỗi trang 1 file DXF + 1 PDF gộp + BOM Excel.
 
 ## Chạy
 ```bash
 pip install ezdxf shapely openpyxl matplotlib
-python make_sheets.py                        # xuất cả bộ 7 tờ, tham số mẫu, góc chiếu 1 (TCVN/ISO-E)
-python make_sheets.py --params my_sofa.json  # kích thước thật của bạn
-python make_sheets.py --projection third     # phép chiếu góc 3
+python make_a4.py                        # tham số mẫu, góc chiếu 1 (TCVN/ISO-E)
+python make_a4.py --params my_sofa.json  # kích thước thật (chỉ ghi khoá cần đổi)
+python make_a4.py --projection third     # góc chiếu 3
 ```
-Kết quả trong `output/` (xem bảng trên), kèm ảnh `_preview.png` từng tờ.
+Kết quả: `output/A4/SF-A4-xx_*.dxf`, `output/SF_A4_BO-BAN-VE.pdf`, `output/SF_BOM.xlsx`.
 
-`my_sofa.json` chỉ cần ghi các khoá muốn đổi, ví dụ: `{"W": 2200, "D": 950, "H_back": 850, "n_mid_rails": 4}`.
-Toàn bộ khoá xem `PARAMS` trong `sofa_model.py`.
+## Danh mục trang (39 trang với tham số mẫu)
+| Trang | Nội dung |
+|---|---|
+| 01 | Tổng thể – 3 hình chiếu |
+| 02 | Tổng thể – hình bung trục đo, nhãn cụm M1..M6, sắt tô đỏ |
+| 03–04 | 5 bước lắp (cụm cũ xám, cụm mới màu, đường bung, phụ kiện) |
+| 05 | Bảng kê chi tiết theo mã biến thể + vật liệu theo quy tắc |
+| 06 | Phụ kiện, tổng hợp vật liệu (m³ LVL / ván ép, số chi tiết sắt), bảng ký hiệu lỗ |
+| 07 | **Chi tiết sắt**: vị trí lắp trong khung ngồi, hình chiếu pát L & thanh gia cố, hướng dẫn lắp |
+| 08–19 | Mỗi cụm 2 trang: hình chiếu (kích thước chuỗi) / hình bung + bảng kê + phụ kiện + vị trí cụm |
+| 20–39 | Mỗi **biến thể chi tiết gỗ** 1 trang gia công: mặt A, cạnh C, 2 đầu E/F, ký hiệu lỗ, bảng toạ độ lỗ |
 
-## Cấu tạo sofa (6 cụm)
-| Cụm | Tên | Chi tiết |
-|---|---|---|
-| M1 | Khung đáy / Base frame | đà đáy trước, sau, giằng đầu, giằng giữa, ke góc |
-| M2 | Khung ngồi / Seat frame | thanh trước/sau, thanh hông, nan ngồi — đặt trên khung đáy |
-| M3, M4 | Gác tay trái/phải / Arms | trụ, thanh trên, giằng dưới, giằng giữa — bulông KD vào khung đáy |
-| M5 | Tựa lưng / Back frame | thanh dưới, trên, thanh đứng — bulông vào trụ gác tay sau |
-| M6 | Chân / Legs | 6 chân, bulông treo |
+## Quy tắc
+- **Vật liệu** (`sofa_model.material_of`): dày 3–18 mm = **ván ép**; dày ≥ 20 mm = **LVL**.
+  Dày ngoài khoảng (vd 19 mm) ghi *CHƯA XÁC ĐỊNH*. Ngoại lệ khai trong `MATERIAL_OVERRIDE` (hiện: chân).
+- **Biến thể** (`holes.py`): lỗ tính từ các điểm liên kết. Chi tiết cùng kích thước được xem là giống nhau
+  khi mẫu lỗ trùng sau khi lật đầu/lật mặt (không tính đối xứng gương; lỗ xuyên không phân biệt mặt vào).
+  Khác lỗ → mã có hậu tố **6A, 6B…**, số vị trí khung **vuông**, ghi chú *"cùng KT – khác lỗ"* ở BOM,
+  tam giác cảnh báo đỏ + yêu cầu ghi mã lên mặt B ở trang gia công.
+- **Hệ toạ độ lỗ**: X dọc chiều dài L, Y dọc rộng W, Z dọc dày T; gốc O góc dưới-trái mặt A.
+  Mặt A/B = 2 mặt lớn, cạnh C/D, đầu E (X=0) / F (X=L).
 
-Trình tự lắp sửa trong `STEP_MODULES` (sofa_model.py).
+## Cấu trúc code
+- `sofa_model.py` – tham số, chi tiết (kể cả sắt nhiều khối), liên kết + phụ kiện, `HOLE_SPEC`, quy tắc vật liệu.
+- `holes.py` – trích lỗ khoan, hệ toạ độ riêng chi tiết, tách biến thể.
+- `make_a4.py` – **lệnh chính**, dựng tất cả trang A4, PDF, Excel.
+- `make_drawing.py` – thư viện vẽ (khử nét khuất, đặt số vị trí, DXF setup).
 
-## Cấu trúc
-- `sofa_model.py` – mô hình tham số: chi tiết (hộp 3D), module M1..M5, liên kết + phụ kiện, vector bung, kiểm tra chồng chi tiết (interference).
-- `make_sheets.py` – **lệnh chính**: xuất tờ tổng + từng tờ cụm, PDF gộp, BOM.
-- `make_drawing.py` – tờ tổng thể; khử nét khuất (sắp độ sâu theo tia + trừ vùng che), đặt số vị trí, vẽ bảng, khung tên, xuất DXF/Excel/preview.
-
-## Layer trong DXF
-`1-NET-THAY`, `2-NET-KHUAT` (HIDDEN), `3-KICH-THUOC`, `4-DUONG-BUNG` (DASHDOT), `5-SO-VI-TRI`, `8-CUM-DA-LAP`, `9-MUI-TEN`, `10-PHU-KIEN`, `M-M1..M6-*` (màu theo cụm).
-Khổ giấy vẽ trong Model ở tỉ lệ 1:10 (khung A1 phóng ×10, LTSCALE=10, DIMSCALE=10). Chữ dùng style `VN` (Arial – Unicode tiếng Việt).
-
-> ⚠️ Kích thước mặc định là **mẫu minh hoạ**, không lấy từ bản vẽ thật. Đối chiếu mẫu sofa trước khi sản xuất.
+> ⚠️ Kích thước, vị trí sắt và phụ kiện là **tham số mẫu** – đối chiếu mẫu thật trước khi sản xuất.

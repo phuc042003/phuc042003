@@ -44,6 +44,14 @@ PARAMS = dict(
     n_slats=7,         # số nan ngồi
     slat_w=60,         # rộng nan
     slat_t=18,         # dày nan
+    # --- sắt (metal) ---
+    pat_a=50,          # dài cánh pát L
+    pat_h=40,          # cao pát L
+    pat_t=3,           # dày pát L
+    pat_drop=10,       # mép trên pát thấp hơn mặt khung ngồi
+    bar_w=20,          # thanh gia cố thép hộp: rộng (theo Y)
+    bar_h=40,          # cao (theo Z)
+    bar_wall=1.4,      # dày thành ống
     # --- tựa lưng ---
     back_t=25,         # dày khung tựa theo Y
     back_bot_h=80,     # cao thanh tựa dưới
@@ -54,7 +62,7 @@ PARAMS = dict(
     leg=50,            # tiết diện chân vuông
     # --- khoảng bung (explode distances) ---
     ex_arm=500, ex_seat_z=650, ex_back_y=500, ex_back_z=1050, ex_leg=300,
-    ex_rail=250, ex_block=250, ex_top=200, ex_slat=160,
+    ex_rail=250, ex_block=250, ex_top=200, ex_slat=160, ex_pat=220, ex_bar=-260,
 )
 
 MODULES = {
@@ -86,6 +94,8 @@ PART_TYPES = {
     "seat_fb":     ("Thanh ngồi trước/sau", "Seat front/back rail", "座框前后档", "Gỗ thông / Pine"),
     "seat_side":   ("Thanh ngồi hông", "Seat side rail", "座框侧档", "Gỗ thông / Pine"),
     "seat_slat":   ("Nan ngồi", "Seat slat", "座板条", "Gỗ thông / Pine"),
+    "pat_L":       ("Pát L sắt", "Steel L-bracket", "L型铁角码", "Thép SS400"),
+    "steel_bar":   ("Thanh gia cố sắt", "Steel reinforcement bar", "加固铁管", "Thép hộp"),
     "arm_post":    ("Trụ gác tay", "Arm post", "扶手立柱", "Gỗ thông / Pine"),
     "arm_top":     ("Thanh gác tay trên", "Arm top rail", "扶手上横档", "Gỗ thông / Pine"),
     "arm_bot":     ("Giằng gác tay dưới", "Arm bottom rail", "扶手下横档", "Gỗ thông / Pine"),
@@ -96,6 +106,29 @@ PART_TYPES = {
     "leg":         ("Chân", "Leg", "脚", "Gỗ cao su / Rubberwood"),
 }
 
+METAL_TYPES = {"pat_L", "steel_bar"}
+# Ngoại lệ không áp quy tắc ván ép / LVL (cần xác nhận với khách)
+MATERIAL_OVERRIDE = {"leg": "Gỗ cao su (ngoại lệ – xác nhận)"}
+
+
+def material_of(ptype, dims, p=None):
+    """Quy tắc vật liệu: dày 3–18 mm = VÁN ÉP; dày ≥ 20 mm = LVL.
+    dims = (L, W, T) với T là kích thước nhỏ nhất."""
+    p = p or PARAMS
+    if ptype == "pat_L":
+        return f"Thép SS400 dày {p['pat_t']:g}, sơn tĩnh điện"
+    if ptype == "steel_bar":
+        return f"Thép hộp {p['bar_w']:g}×{p['bar_h']:g}×{p['bar_wall']:g}, sơn tĩnh điện"
+    if ptype in MATERIAL_OVERRIDE:
+        return MATERIAL_OVERRIDE[ptype]
+    T = dims[2]
+    if 3 <= T <= 18:
+        return f"Ván ép {T:g} mm"
+    if T >= 20:
+        return "LVL"
+    return f"CHƯA XÁC ĐỊNH (dày {T:g} mm ngoài quy tắc)"
+
+
 # Phụ kiện (hardware): mã -> (VN, EN, CN)
 HARDWARE = {
     "A": ("Bulông M8×90 + ốc cấy Ø10", "KD bolt M8×90 + barrel nut", "M8×90螺栓+圆柱螺母"),
@@ -104,7 +137,56 @@ HARDWARE = {
     "D": ("Bulông treo chân M8 + tán cấy", "Hanger bolt M8 + T-nut", "M8脚螺栓+预埋螺母"),
     "E": ("Vít gỗ 4×50 (ke góc)", "Wood screw 4×50 (block)", "木螺丝4×50(角码)"),
     "F": ("Vít gỗ 4×60 (khung ngồi–đáy)", "Wood screw 4×60 (seat–base)", "木螺丝4×60(座框-底框)"),
+    "G": ("Vít gỗ 4×20 (bắt pát L)", "Wood screw 4×20 (L-bracket)", "木螺丝4×20(角码)"),
+    "H": ("Bulông M6×70 + đai ốc hàn", "Bolt M6×70 + weld nut", "M6×70螺栓+焊接螺母"),
+    "K": ("Vít tự khoan 4.2×25", "Self-drilling screw 4.2×25", "自攻钻尾螺丝4.2×25"),
 }
+
+# Lỗ khoan theo (phụ kiện, vai trò chi tiết a/b): (mã lỗ, mô tả, Ø, sâu)
+HOLE_SPEC = {
+    ("A", "a"): ("A1", "Lỗ bulông Ø9 xuyên", 9, "xuyên"),
+    ("A", "b"): ("A2", "Lỗ Ø9 sâu 70 + lỗ ốc cấy Ø10 sâu 30 cách mặt 50", 9, 70),
+    ("B", "a"): ("B1", "Lỗ chốt Ø8 sâu 22", 8, 22),
+    ("B", "b"): ("B1", "Lỗ chốt Ø8 sâu 22", 8, 22),
+    ("C", "a"): ("C1", "Lỗ vít Ø4.5 xuyên + khoét đầu Ø8", 4.5, "xuyên"),
+    ("C", "b"): ("C2", "Lỗ mồi Ø3 sâu 30", 3, 30),
+    ("D", "a"): ("D1", "Lỗ tán cấy M8: Ø10 sâu 15", 10, 15),
+    ("D", "b"): ("D2", "Lỗ bulông treo Ø6 sâu 40", 6, 40),
+    ("E", "a"): ("E2", "Lỗ mồi Ø3 sâu 35", 3, 35),
+    ("E", "b"): ("E1", "Lỗ vít Ø4.5 xuyên", 4.5, "xuyên"),
+    ("F", "a"): ("F2", "Lỗ mồi Ø3 sâu 40", 3, 40),
+    ("F", "b"): ("F1", "Lỗ vít Ø4.5 xuyên + khoét đầu Ø8", 4.5, "xuyên"),
+    ("G", "a"): ("G2", "Lỗ mồi Ø2.5 sâu 15", 2.5, 15),
+    ("G", "b"): ("G1", "Lỗ đột sẵn Ø5 trên pát", 5, "xuyên"),
+    ("H", "a"): ("H1", "Lỗ bulông Ø7 xuyên", 7, "xuyên"),
+    ("H", "b"): ("H2", "Đai ốc hàn M6 ở đầu thanh", 6, "-"),
+    ("K", "a"): ("K2", "Vít tự khoan – không khoan trước", 0, "-"),
+    ("K", "b"): ("K1", "Lỗ Ø4.5 xuyên + khoét đầu Ø8", 4.5, "xuyên"),
+}
+
+
+def loc_name(tag):
+    """Mô tả vị trí lắp từ mã chi tiết (để ghi 'Dùng cho')."""
+    m = {"L": "trái", "R": "phải", "F": "trước", "B": "sau", "M": "giữa"}
+    t = tag
+    out = []
+    if t.startswith("arm"):
+        out.append(m[t[3]])
+        if t.endswith(("_F", "_B")):
+            out.append(m[t[-1]])
+    elif t.startswith(("leg_", "block_")):
+        s_ = t.split("_")[1]
+        out += [m[c] for c in s_]
+    elif t[-2:] in ("_L", "_R"):
+        out.append(m[t[-1]])
+    elif t[-2] == "_" and t[-1].isdigit():
+        out.append(f"số {int(t[-1]) + 1}")
+    elif t.startswith("pat_"):
+        out += [m[c] for c in t.split("_")[1]]
+    for k, v in (("front", "trước"), ("back", "sau")):
+        if k in t and t.startswith(("base_", "seat_")) and t.split("_")[1] == k:
+            out.append(v)
+    return "-".join(out) if out else "—"
 
 
 @dataclass
@@ -116,6 +198,11 @@ class Part:
     part_off: tuple = (0, 0, 0)    # bung cấp chi tiết (part-level explode)
     follow: str = None       # chân đi theo cụm nào khi bung (vd chân góc theo gác tay)
     solo_off: tuple = None   # bung riêng trong bản vẽ từng cụm (None = dùng part_off)
+    subs: list = None        # chi tiết ghép nhiều khối (vd pát L = 2 cánh); box = khối bao
+
+    @property
+    def boxes(self):
+        return self.subs or [self.box]
 
     @property
     def size(self):
@@ -187,6 +274,30 @@ def build(p=None):
     for i, xc in enumerate(slat_x):
         add(f"slat_{i}", "seat_slat", "M2", (xc - sw_ / 2, st, zs1 - stk, xc + sw_ / 2, ys1 - st, zs1),
             part_off=(0, 0, p["ex_slat"]))
+
+    # ---- SẮT: 4 pát L ở 4 góc trong khung ngồi + 1 thanh gia cố đỡ nan ----
+    pa, ph, pt_ = p["pat_a"], p["pat_h"], p["pat_t"]
+    zp1 = zs1 - p["pat_drop"]
+    zp0 = zp1 - ph
+    ix0, ix1 = xi0 + st, xi1 - st                # mặt trong 2 thanh hông
+    iy0, iy1 = st, ys1 - st                      # mặt trong thanh trước / sau
+    for side in "LR":
+        for fb in "FB":
+            sx_ = 1 if side == "L" else -1
+            sy_ = 1 if fb == "F" else -1
+            xc0 = ix0 if side == "L" else ix1
+            yc0 = iy0 if fb == "F" else iy1
+            # cánh 1 áp thanh trước/sau, cánh 2 áp thanh hông
+            w1 = (min(xc0, xc0 + sx_ * pa), min(yc0, yc0 + sy_ * pt_), zp0,
+                  max(xc0, xc0 + sx_ * pa), max(yc0, yc0 + sy_ * pt_), zp1)
+            w2 = (min(xc0, xc0 + sx_ * pt_), min(yc0 + sy_ * pt_, yc0 + sy_ * pa), zp0,
+                  max(xc0, xc0 + sx_ * pt_), max(yc0 + sy_ * pt_, yc0 + sy_ * pa), zp1)
+            bb = tuple(min(w1[k], w2[k]) for k in range(3)) + tuple(max(w1[k + 3], w2[k + 3]) for k in range(3))
+            add(f"pat_{side}{fb}", "pat_L", "M2", bb, part_off=(0, 0, p["ex_pat"]), subs=[w1, w2])
+    yb = (iy0 + iy1) / 2
+    add("steel_bar", "steel_bar", "M2",
+        (ix0, yb - p["bar_w"] / 2, zs1 - stk - p["bar_h"], ix1, yb + p["bar_w"] / 2, zs1 - stk),
+        part_off=(0, 0, p["ex_bar"]))
 
     # ---------------- M3/M4 GÁC TAY ----------------
     zt0 = p["H_arm"] - p["arm_top_h"]
@@ -270,6 +381,23 @@ def build(p=None):
         J("F", f"base_end_{side}", f"seat_side_{side}", [(x, D * 0.35, zb1), (x, D * 0.65, zb1)], step=3)
     for i in range(n):
         J("F", f"base_mid_{i}", "seat_back", [(mid_x[i], ys1 - st / 2, zb1)], step=3)
+    zpm = (zp0 + zp1) / 2
+    for side in "LR":
+        for fb in "FB":
+            tg = f"pat_{side}{fb}"
+            xc0 = ix0 if side == "L" else ix1
+            yc0 = iy0 if fb == "F" else iy1
+            sx_ = 1 if side == "L" else -1
+            sy_ = 1 if fb == "F" else -1
+            J("G", "seat_front" if fb == "F" else "seat_back", tg,
+              [(xc0 + sx_ * pa * 0.3, yc0, zpm), (xc0 + sx_ * pa * 0.75, yc0, zpm)], step=3)
+            J("G", f"seat_side_{side}", tg,
+              [(xc0, yc0 + sy_ * pa * 0.3, zpm), (xc0, yc0 + sy_ * pa * 0.75, zpm)], step=3)
+    zbm = zs1 - stk - p["bar_h"] / 2
+    J("H", "seat_side_L", "steel_bar", [(ix0, yb, zbm)], step=3)
+    J("H", "seat_side_R", "steel_bar", [(ix1, yb, zbm)], step=3)
+    for i, x in enumerate(slat_x):
+        J("K", "steel_bar", f"slat_{i}", [(x, yb, zs1 - stk)], step=3)
     J("A", "armL_post_F", "seat_front", [(Ta, st / 2, zsm)], step=3)
     J("A", "armR_post_F", "seat_front", [(W - Ta, st / 2, zsm)], step=3)
     # Bước 4: tựa lưng — ghép khung, bulông vào trụ gác tay sau, vít xuống đà đáy sau
@@ -314,7 +442,9 @@ def check_overlaps(parts, tol=0.01):
     bad = []
     for i, a in enumerate(parts):
         for b in parts[i + 1:]:
-            ov = [min(a.box[k + 3], b.box[k + 3]) - max(a.box[k], b.box[k]) for k in range(3)]
-            if all(o > tol for o in ov):
-                bad.append((a.tag, b.tag, ov))
+            for ba in a.boxes:
+                for bb in b.boxes:
+                    ov = [min(ba[k + 3], bb[k + 3]) - max(ba[k], bb[k]) for k in range(3)]
+                    if all(o > tol for o in ov):
+                        bad.append((a.tag, b.tag, ov))
     return bad
