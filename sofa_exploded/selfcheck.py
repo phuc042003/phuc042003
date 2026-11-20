@@ -54,7 +54,7 @@ def run(c, docs, out):
     bad1 = []
     for doc, path, name in docs:
         msp = doc.modelspace()
-        ents = [e for e in msp if not (e.dxf.layer == "0-KHUNG-BANVE" and e.dxftype() == "LWPOLYLINE")]
+        ents = [e for e in msp if not (e.dxf.layer == "0-KHUNG-BANVE" and e.dxftype() in ("LWPOLYLINE", "INSERT"))]
         ext = bbox.extents(ents)
         if ext.has_data and (ext.extmin.x < INNER[0] or ext.extmin.y < INNER[1] or ext.extmax.x > INNER[2]
                              or ext.extmax.y > INNER[3]):
@@ -194,7 +194,7 @@ def run_compact(c, docs, out):
     # 1 A4 trong khung
     bad = []
     for doc, path, name in docs:
-        ents = [e for e in doc.modelspace() if not (e.dxf.layer == "0-KHUNG-BANVE" and e.dxftype() == "LWPOLYLINE")]
+        ents = [e for e in doc.modelspace() if not (e.dxf.layer == "0-KHUNG-BANVE" and e.dxftype() in ("LWPOLYLINE", "INSERT"))]
         ext = bbox.extents(ents)
         if ext.has_data and (ext.extmin.x < INNER[0] or ext.extmin.y < INNER[1] or ext.extmax.x > INNER[2]
                              or ext.extmax.y > INNER[3]):

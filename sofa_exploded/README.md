@@ -5,6 +5,7 @@ pip install ezdxf shapely openpyxl matplotlib
 python make_a4.py                        # BỘ GỌN 5 trang A4 + tự kiểm tra
 python make_a4.py --full                 # bộ đầy đủ (mỗi chi tiết 1 trang gia công)
 python make_a4.py --params my_sofa.json  # kích thước thật
+python make_a4.py --frame KHUNG_A4.dxf    # dùng khung bản vẽ của bạn (DXF)
 ```
 Kết quả: `output/A4/SF-01…05_*.dxf`, `output/SF_5TRANG_BAN-VE.pdf`, `output/SF_BOM.xlsx` (BOM + toạ độ lỗ khoan),
 `output/TU-KIEM-TRA.md`.

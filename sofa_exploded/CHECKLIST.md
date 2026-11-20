@@ -42,3 +42,11 @@ Quy tắc: làm xong + tự kiểm 1 bước mới đánh dấu [x] và sang bư
 | E1 | Ô chi tiết gia công thu gọn: biên dạng, dim tổng, dim vị trí lỗ, lỗ mặt/cạnh/đầu, góc vát, mã biến thể | [x] | compact.part_cell() |
 | E2 | Bố cục trang cụm: hình bung + bảng kê/phụ kiện + lưới ô chi tiết + ô chi tiết pát | [x] | SF-02…05 |
 | E3 | Tự kiểm tra thêm tiêu chí "mọi chi tiết gỗ có ô gia công trên trang cụm" ≥ 9/10, xem ảnh, commit | [x] | 12 tiêu chí: 9.33 (lỗ mặt B nét đứt) → 10.0/10; xem ảnh: giãn dim chuỗi thanh dài |
+
+## Vòng 9 – Dùng khung KHUNG_A4 của khách
+
+| # | Bước | Trạng thái | Kiểm chứng |
+|---|---|---|---|
+| F1 | Đọc KHUNG_A4.dwg (AutoCAD 2007 – AC1021) | [ ] BLOCKED | Máy này không có công cụ đọc DWG; build LibreDWG bị từ chối → cần file DXF |
+| F2 | Hỗ trợ `--frame KHUNG.dxf`: nạp khung thành block, tự co giãn về A4, điền thuộc tính (tên, số BV, tỉ lệ, tờ) | [x] | frame_dxf.py; thử với khung DXF mẫu: điền đúng 4 thuộc tính, tự kiểm tra 10/10 |
+| F3 | Chạy với khung thật, chỉnh vùng nội dung tránh khung tên của khách, xem ảnh | [ ] | chờ KHUNG_A4.dxf |

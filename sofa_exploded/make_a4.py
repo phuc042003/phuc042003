@@ -138,7 +138,16 @@ def hw_tag(msp, pos, code, a=24):
     T(msp, code, pos, h=1.5 if len(code) > 1 else 1.8, align=TA.MIDDLE_CENTER, layer="10-PHU-KIEN")
 
 
+USER_FRAME = None          # frame_dxf.UserFrame khi chạy với --frame
+
+
 def frame(msp, title_vn, title_en, dwg, scale, sheet, proj):
+    if USER_FRAME is not None:
+        filled = USER_FRAME.place(msp.doc, dict(title=title_vn, title_en=title_en, dwg=dwg, scale=scale,
+                                                sheet=sheet))
+        if "title" not in filled:          # khung không có thuộc tính: ghi tên vào góc trên
+            T(msp, f"{dwg} – {title_vn} – Tờ {sheet} – TL {scale}", (220, PH - 70), h=1.6)
+        return
     L = "0-KHUNG-BANVE"
     rect(msp, 0, 0, PW, PH, layer=L)
     rect(msp, 200, 100, PW - 100, PH - 100, layer=L, const_width=5)
@@ -1190,8 +1199,17 @@ def main():
     ap.add_argument("--no-pdf", action="store_true")
     ap.add_argument("--png")
     ap.add_argument("--full", action="store_true", help="xuất bộ chi tiết đầy đủ (mỗi chi tiết 1 trang)")
+    ap.add_argument("--frame", help="file khung bản vẽ DXF của bạn (AutoCAD: SAVEAS -> DXF)")
     a = ap.parse_args()
     prm = json.load(open(a.params, encoding="utf-8")) if a.params else None
+    if a.frame:
+        global USER_FRAME
+        import frame_dxf
+        USER_FRAME = frame_dxf.UserFrame(a.frame, PW, PH)
+        import make_a4 as _self                     # compact.py dùng module make_a4
+        _self.USER_FRAME = USER_FRAME
+        print(f"Dùng khung {a.frame}: {USER_FRAME.w:.1f}×{USER_FRAME.h:.1f}, hệ số {USER_FRAME.scale:.3f}, "
+              f"thuộc tính: {USER_FRAME.atts or 'không có'}")
     import selfcheck
     if a.full:
         c, docs = build_all(prm, a.projection, a.out, not a.no_pdf, a.png)
