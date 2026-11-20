@@ -50,3 +50,14 @@ Quy tắc: làm xong + tự kiểm 1 bước mới đánh dấu [x] và sang bư
 | F1 | Đọc KHUNG_A4.dwg (AutoCAD 2007 – AC1021) | [ ] BLOCKED | Máy này không có công cụ đọc DWG; build LibreDWG bị từ chối → cần file DXF |
 | F2 | Hỗ trợ `--frame KHUNG.dxf`: nạp khung thành block, tự co giãn về A4, điền thuộc tính (tên, số BV, tỉ lệ, tờ) | [x] | frame_dxf.py; thử với khung DXF mẫu: điền đúng 4 thuộc tính, tự kiểm tra 10/10 |
 | F3 | Chạy với khung thật, chỉnh vùng nội dung tránh khung tên của khách, xem ảnh | [ ] | chờ KHUNG_A4.dxf |
+
+## Vòng 10 – Bóc tách thử HT-S801 (mô hình 3D của khách) trên khung KHUNG_A4
+
+| # | Bước | Trạng thái | Kiểm chứng |
+|---|---|---|---|
+| G1 | Đọc HT-S801.dxf: 264 khối 3DSOLID (ACIS SAB) – tự viết bộ giải mã đỉnh/mặt/transform | [x] | acis_import.py, 0 lỗi |
+| G2 | Nhận dạng sản phẩm: sofa giường (thân + mặt giường kéo 2×2); phân 5 cụm theo vị trí | [x] | rules.json; xem ảnh tô màu cụm |
+| G3 | Gom 264 chi tiết → 97 mã (lật/xoay tấm được vì không có lỗ), vật liệu theo quy tắc dày | [x] | Excel BOM, tổng SL = 264 |
+| G4 | 6 trang A4 trên khung KHUNG_A4 của khách, điền 7 ô thuộc tính | [x] | import_drawing.py |
+| G5 | Tự kiểm tra 10 tiêu chí: 9.07 → 9.83 → 10.0; xem ảnh, sửa gác tay / ô chi tiết / nhãn tổng | [x] | output_import/TU-KIEM-TRA.md |
+| G6 | Chờ khách xác nhận: phân cụm, tên chi tiết, lỗ khoan / phụ kiện (mô hình không có) | [ ] | |

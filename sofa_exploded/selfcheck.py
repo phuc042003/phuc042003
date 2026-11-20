@@ -302,3 +302,70 @@ def run_compact(c, docs, out):
         f.write("\n".join(lines) + "\n")
     print("\n".join(lines))
     return score, res
+
+
+def run_import(ctx, docs, out, MODS, has_frame):
+    """Tự kiểm tra bộ bản vẽ bóc tách từ mô hình 3D của khách."""
+    res = []
+    N = len(docs)
+    LIM = (20, 190, 2950, 2085)
+    bad = []
+    for doc, path, name in docs:
+        ents = [e for e in doc.modelspace() if not (e.dxf.layer == "0-KHUNG-BANVE" and e.dxftype() in ("LWPOLYLINE", "INSERT"))]
+        ext = bbox.extents(ents)
+        if ext.has_data and (ext.extmin.x < LIM[0] or ext.extmin.y < LIM[1] or ext.extmax.x > LIM[2] or ext.extmax.y > LIM[3]):
+            bad.append(f"{name} ({ext.extmin.x:.0f},{ext.extmin.y:.0f})–({ext.extmax.x:.0f},{ext.extmax.y:.0f})")
+    res.append(("Nằm trong vùng vẽ của khung (không đè khung tên)", 1 - len(bad) / N, bad))
+    bad = []
+    for doc, path, name in docs:
+        bx = [(_text_box(e), e.dxf.text) for e in doc.modelspace().query("TEXT")]
+        n, ex = 0, []
+        for i in range(len(bx)):
+            for j in range(i + 1, len(bx)):
+                if _overlap(bx[i][0], bx[j][0]) > 0.25:
+                    n += 1
+                    if len(ex) < 3:
+                        ex.append(f"'{bx[i][1][:14]}'×'{bx[j][1][:14]}'")
+        if n:
+            bad.append(f"{name}: {n} cặp ({'; '.join(ex)})")
+    res.append(("Không chữ chồng chữ", 1 - len(bad) / N, bad))
+    present = [m for m in MODS if any(q.module == m for q in ctx.parts)]
+    names = [d[2] for d in docs]
+    bad = [m for m in present if names.count(m) != 1] + ([] if "TONG-THE" in names else ["thiếu trang tổng"])
+    res.append(("1 trang tổng + mỗi cụm đúng 1 trang", 1 - len(bad) / (len(present) + 1), bad))
+    nq = sum(g["qty"] for g in ctx.codes.values())
+    bad = ([f"tổng SL {nq} ≠ {len(ctx.parts)} chi tiết"] if nq != len(ctx.parts) else []) + \
+          [q.tag for q in ctx.parts if not q.module or not q.code][:5]
+    res.append(("Mọi chi tiết đã phân cụm + có mã", 0 if bad else 1, bad))
+    bad = []
+    for doc, path, name in docs:
+        if name not in MODS:
+            continue
+        have = {e.dxf.text for e in doc.modelspace().query("TEXT") if e.dxf.layer == "5-SO-VI-TRI"}
+        need = [c for c, g in ctx.codes.items() if g["module"] == name]
+        bad += [f"{name}: thiếu số {c}" for c in need if c not in have]
+    res.append(("Mọi mã có số vị trí + ô chi tiết trên trang cụm", 1 - len(bad) / max(len(ctx.codes) * 2, 1), bad))
+    bad = [f"{name}: {len(doc.modelspace().query('*[layer==\"2-NET-KHUAT\"]'))}" for doc, _, name in docs
+           if len(doc.modelspace().query('*[layer=="2-NET-KHUAT"]'))]
+    res.append(("Không nét khuất", 1 - len(bad) / N, bad))
+    bad = [c for c, g in ctx.codes.items() if "CHƯA XÁC ĐỊNH" in g["mat"]]
+    res.append(("Vật liệu theo quy tắc (không có CHƯA XÁC ĐỊNH)", 1 - len(bad) / max(len(ctx.codes), 1), bad))
+    missing = [c for c in ctx.codes if c not in ctx.report["cells"]]
+    res.append(("Ô chi tiết đủ cho mọi mã", 1 - len(missing) / max(len(ctx.codes), 1), missing))
+    if has_frame:
+        need = {"title", "sheet", "scale", "date", "code"}
+        bad = [f"{k}: thiếu {sorted(need - set(v))}" for k, v in ctx.report["frame"].items() if not need <= set(v)]
+        res.append(("Điền ô khung tên (tên, tờ, tỉ lệ, ngày, mã hàng)", 1 - len(bad) / N, bad))
+    else:
+        res.append(("Điền ô khung tên", 0.5, ["không dùng khung khách"]))
+    lab = ctx.report["labels"].get("TONG-THE", [])
+    res.append(("Trang tổng có nhãn mọi cụm", 1 if len(lab) >= len(present) else 0, []))
+    score = round(sum(max(0, r[1]) for r in res) / len(res) * 10, 2)
+    lines = [f"# TỰ KIỂM TRA – BÓC TÁCH TỪ MÔ HÌNH 3D ({N} trang A4, {len(ctx.parts)} chi tiết, {len(ctx.codes)} mã)", "",
+             f"**ĐIỂM: {score} / 10**", "", "| # | Tiêu chí | Điểm | Lỗi |", "|---|---|---|---|"]
+    for i, (nm, sc, bd) in enumerate(res, 1):
+        lines.append(f"| {i} | {nm} | {max(0, sc):.2f} | {'; '.join(map(str, bd[:5])) or '—'} |")
+    with open(os.path.join(out, "TU-KIEM-TRA.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    return score

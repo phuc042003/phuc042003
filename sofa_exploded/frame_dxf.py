@@ -14,12 +14,16 @@ from ezdxf import bbox
 from ezdxf.addons import Importer
 
 TAGS = {
-    "title": ("TEN_BV", "TITLE", "TENBANVE", "TEN_BAN_VE", "DRAWING_TITLE"),
+    "title": ("CHITIET", "TEN_BV", "TITLE", "TENBANVE", "TEN_BAN_VE", "DRAWING_TITLE"),
     "title_en": ("TEN_EN", "TITLE_EN"),
     "dwg": ("SO_BV", "DWG_NO", "SOBANVE", "SO_BAN_VE", "DRAWING_NO"),
-    "scale": ("TI_LE", "SCALE", "TILE", "TY_LE"),
-    "sheet": ("TO", "SHEET", "SO_TO", "SHEET_NO"),
-    "date": ("NGAY", "DATE"),
+    "scale": ("SCALE", "TI_LE", "TILE", "TY_LE"),
+    "sheet": ("SỐTRANG", "TO", "SHEET", "SO_TO", "SHEET_NO", "SOTRANG"),
+    "date": ("NGÀYVẼ", "NGAY", "DATE", "NGAYVE"),
+    "product": ("TÊNSP", "TENSP", "PRODUCT"),
+    "code": ("MÃHÀNG", "MAHANG", "ITEM_NO"),
+    "qty": ("SỐLUONG", "SỐLƯỢNG", "SOLUONG", "QTY"),
+    "customer": ("KHÁCH", "KHACH", "CUSTOMER"),
 }
 
 
